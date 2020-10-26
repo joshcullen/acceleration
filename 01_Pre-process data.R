@@ -64,19 +64,27 @@ dat.GPS<- dat2 %>%
   map(., distinct, Acquisition.Start.Time, .keep_all = T) %>% #remove duplicate rows
   map(., ~mutate(., dt = as.numeric(difftime(Acquisition.Start.Time, lag(Acquisition.Start.Time),
                                              units = "min")),
-                 .before = Activity.Count)) %>% 
+                 .before = Activity.Count)) %>%
   bind_rows() %>% 
   dplyr::select(-date) %>% 
   rename(date = Acquisition.Start.Time)
 
-dat.GPS<- round_track_time(dat = dat.GPS, id = "id", int = 7, tol = 1)  #round dt
 
-table(dat.GPS$dt)  #all but 3078 of 1072 (0.02%) are at 7 min interval; most others are at 14, 21, or 28 min intervals due to failed signals or at 663 min during daytime period
+# Fill in large time gaps with NA and round times
+dat.GPS<- dat.GPS %>% 
+  fill_NA(data = ., int = 7) %>% 
+  round_track_time(dat = ., id = "id", int = 7, tol = 1)  #round dt
 
+table(dat.GPS$dt)  #all but 554 of 99290 (0.56%) are at 7 min interval; most others are at 12 min interval
+
+
+# Filter times to time interval
 dat.GPS.list<- df_to_list(dat.GPS, "id")
 dat.GPS.filt<- filter_time(dat.GPS.list, int = 7)
 
 
+
+# Merge AC and GPS data
 plan(multisession)
 tic()
 dat.merged<- future_map2(dat.AC.filt, dat.GPS.filt,
@@ -84,14 +92,7 @@ dat.merged<- future_map2(dat.AC.filt, dat.GPS.filt,
                   .progress = TRUE, .options = future_options(seed = TRUE)) %>% 
   bind_rows()
 toc()
-# takes 6 s to run for 49929 GPS observations
-
-
-
-#### STEPS FOR MOVING FORWARD TO COMBINE ACTIVITY COUNTS AND GPS DATA ####
-# 1) Try to include observations within long, daytime time gaps where AC is measured but GPS is not available; could provide further support for "Burrow" state
-
-
+# takes 14 s to run for 99290 GPS observations
 
 
 
@@ -106,7 +107,30 @@ ggplot(dat.merged, aes(Activity.Count)) +
 
 
 
-#### NEED TO UPDATE FROM HERE; THIS INCLUDES CALCULATION OF STEP LENGTHS AND TURNING ANGLES TO BE BINNED ALONG WITH ACTIVITY COUNTS FOR ANALYSIS BY MODEL ####
+
+# Calculate step lengths and turning angles
+dat.merged2<- prep_data(dat = dat.merged, coord.names = c('GPS.UTM.Easting','GPS.UTM.Northing'),
+                        id = "id")
+
+# Viz distribution of step lengths and turning angles
+ggplot(dat.merged2, aes(step)) +
+  geom_density(aes(fill = id)) +
+  theme_bw() +
+  facet_wrap(~ id)
+
+ggplot() +
+  geom_path(data = dat.merged2, aes(x, y, color = id)) + 
+  theme_bw() +
+  facet_wrap(~id, scales = "free")
+# appears to be issues w/ some excessively long step lengths; need to talk to Nina about what might be possible for this species
+
+
+ggplot(dat.merged2, aes(angle)) +
+  geom_density(aes(fill = id)) +
+  theme_bw() +
+  facet_wrap(~ id)
+
+
 
 ### Define Bin Limits ###
 

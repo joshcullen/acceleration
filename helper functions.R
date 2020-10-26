@@ -32,3 +32,54 @@ for (i in 1:nrow(tmp.GPS)) {
 
 tmp.GPS
 }
+
+#----------------------------------------
+
+fill_NA = function(data, int) {
+  # dt must be in minutes until I make updates to allow other units
+  
+  dat.list<- bayesmove::df_to_list(data, "id")
+  
+  dat.list<- purrr::map(dat.list, ~{
+    
+    dat<- data.frame(.)
+    ind<- which(!is.na(dat$dt) & dat$dt > int)
+    ind2<- ind - 1
+    
+    for (i in 1:length(ind)) {
+      print(i)
+      if (dat$dt[ind[i]] >= 2*int & dat$dt[ind[i]] < 7*24*60) {
+        
+        # cond<- dat$dt[ind[i]] %% int == 0  #check if dt is multiple of int
+        vec.length<- floor(dat$dt[ind[i]]/int)  #find multiple of int in dt to determine seq length
+        seq.dates<- seq(dat$date[ind2[i]], dat$date[ind[i]], by = paste(int, units))[1:vec.length]
+        tmp1<- as.data.frame(lapply(dat[ind2[i],], rep, length(seq.dates)))
+        tmp1$date<- seq.dates
+        tmp1$dt<- int
+        
+        dat[seq(ind2[i]+vec.length, nrow(dat)+vec.length-1),]<- dat[ind[i]:nrow(dat),]
+        dat[ind2[i]:(ind2[i]+vec.length-1),]<- tmp1
+        
+        ind<- ind + (vec.length - 1)  #update index
+        ind2<- ind2 + (vec.length - 1)  #update index
+        
+      } else {
+        dat<- dat
+      }
+    }
+    
+    
+    #update dt column and remove any duplicate rows
+    dat$dt<- as.numeric(difftime(dat$date, lag(dat$date), units = "min"))
+    dat<- dplyr::distinct(dat, date, .keep_all = TRUE)
+    
+    dat
+    })
+  
+  dat.out<- dplyr::bind_rows(dat.list)
+  
+  dat.out
+}
+
+
+
