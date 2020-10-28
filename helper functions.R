@@ -35,8 +35,9 @@ tmp.GPS
 
 #----------------------------------------
 
-fill_NA = function(data, int) {
+fill_NA = function(data, int, units = "min") {
   # dt must be in minutes until I make updates to allow other units
+  # units must be "min" for now
   
   dat.list<- bayesmove::df_to_list(data, "id")
   
@@ -47,7 +48,6 @@ fill_NA = function(data, int) {
     ind2<- ind - 1
     
     for (i in 1:length(ind)) {
-      print(i)
       if (dat$dt[ind[i]] >= 2*int & dat$dt[ind[i]] < 7*24*60) {
         
         # cond<- dat$dt[ind[i]] %% int == 0  #check if dt is multiple of int

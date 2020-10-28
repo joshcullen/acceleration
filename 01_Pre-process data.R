@@ -28,7 +28,7 @@ head(dat[ind.na,])
 
 
 
-### Clean Data ###
+### Prep Data for Model ###
 
 dat2<- dat %>% 
   dplyr::select(-c(X,X.1)) %>%  #remove rowname cols
@@ -74,7 +74,6 @@ dat.GPS<- dat2 %>%
 dat.GPS<- dat.GPS %>% 
   fill_NA(data = ., int = 7) %>% 
   round_track_time(dat = ., id = "id", int = 7, tol = 1)  #round dt
-
 table(dat.GPS$dt)  #all but 554 of 99290 (0.56%) are at 7 min interval; most others are at 12 min interval
 
 
@@ -84,7 +83,8 @@ dat.GPS.filt<- filter_time(dat.GPS.list, int = 7)
 
 
 
-# Merge AC and GPS data
+### Merge AC and GPS data ###
+
 plan(multisession)
 tic()
 dat.merged<- future_map2(dat.AC.filt, dat.GPS.filt,
@@ -96,12 +96,25 @@ toc()
 
 
 
+# Remove all rows where both AC and GPS coords are NA
+dat.merged<- dat.merged %>% 
+  filter(!is.na(Activity.Count) | !is.na(GPS.UTM.Easting))
 
-# Viz distribution of Activity.Count
+
+
+
+### Inspect Data to Check for Aberrant Observations ###
+
+# Viz distribution and time series of Activity.Count
 ggplot(dat.merged, aes(Activity.Count)) +
   geom_density(aes(fill = id)) +
   theme_bw() +
   facet_wrap(~ id)
+
+ggplot() +
+  geom_path(data = dat.merged, aes(time1, Activity.Count, color = id)) +
+  theme_bw() +
+  facet_wrap(~id, scales = "free")
 
 # All IDs show highly right-skewed distributions; use quantiles to define bin limits
 
@@ -112,25 +125,97 @@ ggplot(dat.merged, aes(Activity.Count)) +
 dat.merged2<- prep_data(dat = dat.merged, coord.names = c('GPS.UTM.Easting','GPS.UTM.Northing'),
                         id = "id")
 
-# Viz distribution of step lengths and turning angles
+
+
+# Viz distribution and time series of step lengths
 ggplot(dat.merged2, aes(step)) +
   geom_density(aes(fill = id)) +
   theme_bw() +
   facet_wrap(~ id)
 
 ggplot() +
+  geom_path(data = dat.merged2, aes(time1, step, color = id)) +
+  theme_bw() +
+  facet_wrap(~id, scales = "free")
+
+# Viz map of tracks to pickup on unusual movement patterns
+ggplot() +
   geom_path(data = dat.merged2, aes(x, y, color = id)) + 
   theme_bw() +
   facet_wrap(~id, scales = "free")
-# appears to be issues w/ some excessively long step lengths; need to talk to Nina about what might be possible for this species
+# appears to be issues w/ some excessively long step lengths and outlier observations; these need to be removed
 
 
-ggplot(dat.merged2, aes(angle)) +
+
+# Filter out steps > 2000 m
+dat.merged3<- dat.merged2 %>% 
+  filter(step <= 2000 | is.na(step))
+
+
+# Viz map of tracks to pickup on unusual movement patterns
+ggplot() +
+  geom_path(data = dat.merged3, aes(x, y, color = id)) + 
+  theme_bw() +
+  facet_wrap(~id, scales = "free")
+# still some outlier observations; these need to be indexed directly
+
+
+
+
+## Index outliers for "tex" and "mazeboti"
+ind<- c(which(dat.merged3$id == "tex" & dat.merged3$x < 600000),
+        which(dat.merged3$id == "mazeboti" & dat.merged3$x < 600000 | dat.merged3$x > 650000))
+dat.merged3<- dat.merged3[-ind,]
+
+
+
+# Viz map of tracks to pickup on unusual movement patterns
+ggplot(data = dat.merged3, aes(x, y)) +
+  geom_point(aes(color = id), alpha = 0.6) +
+  geom_path() + 
+  theme_bw() +
+  facet_wrap(~id, scales = "free")
+
+ggplot(data = dat.merged3, aes(x, y)) +
+  geom_path(aes(group = id, color = id)) + 
+  geom_point(aes(color = id), alpha = 0.4) +
+  theme_bw()
+# looks much better, but may still want to filter out more observations later; stick w/ this for now
+
+
+
+# Viz distribution and time series of step lengths
+ggplot(dat.merged3, aes(step)) +
   geom_density(aes(fill = id)) +
   theme_bw() +
   facet_wrap(~ id)
 
+ggplot() +
+  geom_path(data = dat.merged3, aes(time1, step, color = id)) +
+  theme_bw() +
+  facet_wrap(~id, scales = "free_x")
 
+
+
+#Viz distribution of turning angles
+ggplot(dat.merged3, aes(angle)) +
+  geom_density(aes(fill = id)) +
+  theme_bw() +
+  facet_wrap(~ id)
+
+# Viz time series of turning angles
+ggplot() +
+  geom_path(data = dat.merged3, aes(time1, angle, color = id)) +
+  theme_bw() +
+  facet_wrap(~id, scales = "free")
+
+
+
+## Originally started w/ 140166 activity count obs and 18433 GPS obs, which was filtered to retain a total of 67872 obs
+
+
+
+# PICK BACK UP FROM HERE; DATA SHOULD NOW BE IN FORMAT READY FOR ANALYSIS
 
 ### Define Bin Limits ###
 
