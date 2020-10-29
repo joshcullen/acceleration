@@ -26,6 +26,7 @@ nbins<- 6
 
 plan(multisession)  #run all MCMC chains in parallel
 dat.res<- segment_behavior(data = dat.list2, ngibbs = ngibbs, nbins = nbins, alpha = alpha)
+future:::ClusterRegistry("stop")  #close all threads and memory used
 # takes 17.5 min to run 15000 iterations
 
 

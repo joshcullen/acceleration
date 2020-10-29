@@ -215,17 +215,25 @@ ggplot() +
 
 
 
-# PICK BACK UP FROM HERE; DATA SHOULD NOW BE IN FORMAT READY FOR ANALYSIS
 
 ### Define Bin Limits ###
 
-# Define bin number and limits (start w/ 6)
-act.bin.lims=quantile(filtered.df$Activity.Count,
-                       c(0,0.50,0.75,0.80,0.85,0.95,1), na.rm=T)  #6 bins
-act.bin.lims  #all 0s fall w/in bottom 50% of data
+# Activity Counts (start w/ 5)
+act.bin.lims=quantile(dat.merged3$Activity.Count,
+                       c(0,0.75,0.80,0.85,0.95,1), na.rm=T)  #5 bins
+#values from 0-18 assumed to represent little to no actual movement; reflective of remaining within a burrow
+
+# Turning Angles (start w/ 8)
+angle.bin.lims=seq(from=-pi, to=pi, by=pi/4)  #8 bins
+
+# Step Lengths (start w/ 5)
+dist.bin.lims=quantile(dat.merged3$step,
+                       c(0,0.50,0.75,0.95,0.99,1), na.rm=T) #5 bins
+
+
 
 # Viz density distribs w/ bin limits
-ggplot(filtered.df, aes(Activity.Count)) +
+ggplot(dat.merged3, aes(Activity.Count)) +
   geom_density(fill = "cadetblue") +
   geom_vline(data = data.frame(lims = act.bin.lims), aes(xintercept = lims), 
              linetype = "dashed") +
@@ -233,19 +241,42 @@ ggplot(filtered.df, aes(Activity.Count)) +
   theme(panel.grid = element_blank(),
         axis.title = element_text(size = 16),
         axis.text = element_text(size = 12))
-  # facet_wrap(~ id)
+
+
+ggplot(dat.merged3, aes(step)) +
+  geom_density(fill = "lightblue") +
+  geom_vline(data = data.frame(lims = dist.bin.lims), aes(xintercept = lims), 
+             linetype = "dashed") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12))
+
+
+ggplot(dat.merged3, aes(angle)) +
+  geom_density(fill = "indianred") +
+  geom_vline(data = data.frame(lims = angle.bin.lims), aes(xintercept = lims), 
+             linetype = "dashed") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12))
 
 
 
 # Assign bins to observations
+dat.list<- df_to_list(dat.merged3, "id")
 dat_disc.list<- map(dat.list,
                        discrete_move_var,
-                       lims = list(act.bin.lims),
-                       varIn = c("Activity.Count"),
-                       varOut = c("AC"))
+                       lims = list(act.bin.lims, dist.bin.lims, angle.bin.lims),
+                       varIn = c("Activity.Count", "step", "angle"),
+                       varOut = c("AC","SL","TA"))
+
+
+dat_disc.list2<- map(dat_disc.list, subset, select = c(id, AC, SL, TA))
+
 
 #Viz discretized distrib
-dat_disc.list2<- map(dat_disc.list, subset, select = c(id, AC))
 dat_disc.df<- dat_disc.list2 %>% 
   bind_rows() %>% 
   gather(key, value, -id)
@@ -254,16 +285,33 @@ param.prop<- dat_disc.df %>%
   group_by(key, value) %>%
   summarise(n=n()) %>%
   mutate(prop=n/nrow(dat_disc.df)) %>%
-  ungroup()  #if don't ungroup after grouping, ggforce won't work
+  ungroup() %>%   #if don't ungroup after grouping, ggforce won't work
+  drop_na()
 
-param.prop[1:6, "value"]<- ((diff(act.bin.lims)/2) + act.bin.lims[1:6])
+param.prop[1:5, "value"]<- ((diff(act.bin.lims)/2) + act.bin.lims[1:5])
+param.prop[6:10, "value"]<- ((diff(dist.bin.lims)/2) + dist.bin.lims[1:5])
+param.prop[11:18, "value"]<- (diff(angle.bin.lims)/2) + angle.bin.lims[1:8]
 
+ggplot(data = param.prop %>% filter(key == "AC"), aes(value, prop)) +
+  geom_bar(stat = "identity", width = diff(act.bin.lims),
+           fill = "cadetblue", color = "black") +
+  labs(x = "Activity Count", y = "Proportion") +
+  theme_bw() +
+  theme(panel.grid = element_blank(), axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12))
 
-ggplot(data = param.prop , aes(value, prop)) +
-  geom_bar(stat = "identity", width = (diff(act.bin.lims)),
+ggplot(data = param.prop %>% filter(key == "SL"), aes(value, prop)) +
+  geom_bar(stat = "identity", width = diff(dist.bin.lims),
            fill = "lightblue", color = "black") +
-  # facet_zoom(xlim = c(0,3)) +
-  labs(x = "Activity Counts", y = "Proportion") +
+  labs(x = "Step Length (m)", y = "Proportion") +
+  theme_bw() +
+  theme(panel.grid = element_blank(), axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12))
+
+ggplot(data = param.prop %>% filter(key == "TA"), aes(value, prop)) +
+  geom_bar(stat = "identity", width = diff(angle.bin.lims),
+           fill = "indianred", color = "black") +
+  labs(x = "Turning Angle (rad)", y = "Proportion") +
   theme_bw() +
   theme(panel.grid = element_blank(), axis.title = element_text(size = 16),
         axis.text = element_text(size = 12))
