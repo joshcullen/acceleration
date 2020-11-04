@@ -8,10 +8,12 @@ library(future)
 
 ### Import Data ###
 dat<- read.csv("Binned Armadillo Acceleration Data.csv", as.is = T)
+dat$date<- as_datetime(dat$date)
+dat$day<- yday(dat$date)  #for purposes of pre-specifying breakpoints
 dat.list<- df_to_list(dat, "id")
 
-# Only retain id and discretized step length (SL) and turning angle (TA) columns
-dat.list2<- map(dat.list, subset, select = c(id, AC))
+# Only retain id and discretized data streams
+dat.list2<- map(dat.list, subset, select = c(id, AC, SL, TA))
 
 
 
@@ -20,14 +22,16 @@ dat.list2<- map(dat.list, subset, select = c(id, AC))
 set.seed(1)
 
 alpha<- 1
-ngibbs<- 15000
-nbins<- 6
+ngibbs<- 20000
+nbins<- c(5,5,8)
+breaks<- map(dat.list, ~find_breaks(., "day"))
 
 
 plan(multisession)  #run all MCMC chains in parallel
-dat.res<- segment_behavior(data = dat.list2, ngibbs = ngibbs, nbins = nbins, alpha = alpha)
+dat.res<- segment_behavior(data = dat.list2, ngibbs = ngibbs, nbins = nbins, alpha = alpha,
+                           breakpt = breaks)
 future:::ClusterRegistry("stop")  #close all threads and memory used
-# takes 17.5 min to run 15000 iterations
+# takes 56 min to run 20000 iterations
 
 
 # Trace-plots for the number of breakpoints and LML
@@ -39,7 +43,7 @@ traceplot(data = dat.res$LML, ngibbs = ngibbs, type = "LML")
 
 
 # Determine MAP for selecting breakpoints
-MAP.est<- get_MAP(dat = dat.res$LML, nburn = 7500)
+MAP.est<- get_MAP(dat = dat.res$LML, nburn = ngibbs/2)
 brkpts<- get_breakpts(dat = dat.res$brkpts, MAP.est = MAP.est)
 
 # How many breakpoints estimated per ID?
@@ -47,8 +51,12 @@ apply(brkpts[,-1], 1, function(x) length(purrr::discard(x, is.na)))
 
 
 # Plot breakpoints over the data
-plot_heatmap(data = dat.list2, nbins = nbins, brkpts = brkpts, title = TRUE, legend = TRUE)
+plot_breakpoints(data = dat.list, as_date = FALSE, var_names = c("AC","SL","TA"),
+                 var_labels = c('AC Bins', 'SL Bins', 'TA Bins'), brkpts = brkpts)
 
+plot_breakpoints(data = dat.list, as_date = TRUE, var_names = c("Activity.Count","step","angle"),
+                 var_labels = c('Activity Count', 'Step Length (m)', 'Turning Angle (rad)'),
+                 brkpts = brkpts)
 
 
 

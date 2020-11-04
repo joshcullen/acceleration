@@ -286,7 +286,8 @@ param.prop<- dat_disc.df %>%
   summarise(n=n()) %>%
   mutate(prop=n/nrow(dat_disc.df)) %>%
   ungroup() %>%   #if don't ungroup after grouping, ggforce won't work
-  drop_na()
+  drop_na() %>% 
+  data.frame()
 
 param.prop[1:5, "value"]<- ((diff(act.bin.lims)/2) + act.bin.lims[1:5])
 param.prop[6:10, "value"]<- ((diff(dist.bin.lims)/2) + dist.bin.lims[1:5])

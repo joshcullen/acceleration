@@ -10,11 +10,11 @@ dat<- read.csv("Segmented Armadillo Acceleration.csv", as.is = T)
 dat$date<- as_datetime(dat$date)
 
 
-# Select only id, tseg, and AC columns
-dat2<- dat[,c("id","tseg","AC")]
+# Select only id, tseg, AC, SL, and TA
+dat2<- dat[,c("id","tseg","AC","SL","TA")]
 
 # Summarize observations by track segment
-nbins<- 6
+nbins<- c(5,5,8)
 obs<- summarize_tsegs(dat = dat2, nbins = nbins)
 head(obs)
 
@@ -39,7 +39,7 @@ alpha<- 0.1
 res<- cluster_segments(dat=obs, gamma1=gamma1, alpha=alpha,
                        ngibbs=ngibbs, nmaxclust=nmaxclust,
                        nburn=nburn, ndata.types=ndata.types)
-# takes 33 s to run on 1000 iterations
+# takes 58 s to run on 1000 iterations
 
 # Check traceplot of log likelihood
 plot(res$loglikel, type='l', xlab = "Iteration", ylab = "Log Likelihood")
@@ -75,14 +75,14 @@ ggplot(theta.estim_df, aes(behavior, prop)) +
 (theta.means<- round(colMeans(theta.estim), digits = 3))
 
 # Calculate cumulative sum
-cumsum(theta.means)  #first 3 clusters account for 95.4% of obs; stick with these
+cumsum(theta.means)  #first 2 clusters account for 93.8% of obs; stick with these
 
 
 
 
 # Extract bin estimates from phi matrix
 behav.res<- get_behav_hist(dat = res, nburn = nburn, ngibbs = ngibbs, nmaxclust = nmaxclust,
-                           var.names = c("Activity Count"))
+                           var.names = c("Activity Count","Step Length", "Turning Angle"))
 
 # Plot histograms of proportion data
 ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
@@ -94,22 +94,21 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
         axis.text.x.bottom = element_text(size = 12),
         strip.text = element_text(size = 14),
         strip.text.x = element_text(face = "bold")) +
-  scale_fill_manual(values = c("#21908CFF","#440154FF","#FDE725FF",
+  scale_fill_manual(values = c(viridis::viridis(2),"grey35",
                                "grey35","grey35","grey35","grey35"), guide = FALSE) +
   scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
-  scale_x_continuous(breaks = 1:6) +
+  scale_x_continuous(breaks = 1:8) +
   facet_grid(behav ~ var, scales = "free_x")
 
 
-## State 3 is low activity
-## State 2 is moderate activity
-## State 1 is high activity
+## State 1 is low activity
+## State 2 is high activity
 
 
 # Reformat proportion estimates for all track segments
 theta.estim.long<- expand_behavior(dat = dat, theta.estim = theta.estim, obs = obs,
-                                   nbehav = 3, behav.names = c("High", "Moderate", "Low"),
-                                   behav.order = c(3,2,1))
+                                   nbehav = 2, behav.names = c("Low", "High"),
+                                   behav.order = 1:2)
 
 # Plot results
 ggplot(theta.estim.long) +
