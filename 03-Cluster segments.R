@@ -40,6 +40,7 @@ res<- cluster_segments(dat=obs, gamma1=gamma1, alpha=alpha,
                        ngibbs=ngibbs, nmaxclust=nmaxclust,
                        nburn=nburn, ndata.types=ndata.types)
 # takes 58 s to run on 1000 iterations
+# takes 12 s to run using only SL and TA
 
 # Check traceplot of log likelihood
 plot(res$loglikel, type='l', xlab = "Iteration", ylab = "Log Likelihood")
@@ -101,14 +102,12 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
   facet_grid(behav ~ var, scales = "free_x")
 
 
-## State 1 is low activity
-## State 2 is high activity
 
 
 # Reformat proportion estimates for all track segments
 theta.estim.long<- expand_behavior(dat = dat, theta.estim = theta.estim, obs = obs,
-                                   nbehav = 2, behav.names = c("Low", "High"),
-                                   behav.order = 1:2)
+                                   nbehav = 2, behav.names = c("High", "Low"),
+                                   behav.order = 2:1)
 
 # Plot results
 ggplot(theta.estim.long) +
@@ -136,6 +135,35 @@ dat.list<- df_to_list(dat = dat, ind = "id")
 dat.out<- assign_behavior(dat.orig = dat,
                              dat.seg.list = dat.list,
                              theta.estim.long = theta.estim.long,
-                             behav.names = c("Low","Moderate","High"))
+                             behav.names = c("Low","High"))
+dat.out$behav<- factor(dat.out$behav, levels = c("Low", "High"))
+
+
+
+
+ggplot() +
+  geom_path(data = dat.out, aes(x=x, y=y), color="gray60", size=0.25) +
+  geom_point(data = dat.out, aes(x, y, fill=behav), size=2.5, pch=21, alpha=0.7) +
+  geom_point(data = dat.out %>%
+               group_by(id) %>%
+               slice(which(row_number() == 1)) %>%
+               ungroup(), aes(x, y), color = "green", pch = 21, size = 3,
+             stroke = 1.25) +
+  geom_point(data = dat.out %>%
+               group_by(id) %>%
+               slice(which(row_number() == n())) %>%
+               ungroup(), aes(x, y), color = "red", pch = 24, size = 3,
+             stroke = 1.25) +
+  scale_fill_viridis_d("") +
+  labs(x = "Easting", y = "Northing") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 10),
+        strip.text = element_text(size = 14, face = "bold"),
+        panel.grid = element_blank(),
+        legend.position = "top") +
+  guides(fill = guide_legend(label.theme = element_text(size = 12),
+                             title.theme = element_text(size = 14))) +
+  facet_wrap(~id, scales = "free")
 
 

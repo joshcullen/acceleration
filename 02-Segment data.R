@@ -10,7 +10,18 @@ library(future)
 dat<- read.csv("Binned Armadillo Acceleration Data.csv", as.is = T)
 dat$date<- as_datetime(dat$date)
 dat$day<- yday(dat$date)  #for purposes of pre-specifying breakpoints
-dat.list<- df_to_list(dat, "id")
+
+#Remove days where SL & TA data is NA
+filter_by_day = function(data) {
+  cond<- unique(data[which(!is.na(data$SL)), "day"])
+  data<- data %>% 
+    filter(day %in% cond)
+  
+  data
+}
+
+dat.list<- df_to_list(dat, "id") %>% 
+  map(., filter_by_day)
 
 # Only retain id and discretized data streams
 dat.list2<- map(dat.list, subset, select = c(id, AC, SL, TA))
@@ -32,6 +43,8 @@ dat.res<- segment_behavior(data = dat.list2, ngibbs = ngibbs, nbins = nbins, alp
                            breakpt = breaks)
 future:::ClusterRegistry("stop")  #close all threads and memory used
 # takes 56 min to run 20000 iterations
+# takes 5 min for only SL and TA data
+# takes 56 min for filtered AC, SL, TA data to run 20000 iterations
 
 
 # Trace-plots for the number of breakpoints and LML
@@ -52,10 +65,10 @@ apply(brkpts[,-1], 1, function(x) length(purrr::discard(x, is.na)))
 
 # Plot breakpoints over the data
 plot_breakpoints(data = dat.list, as_date = FALSE, var_names = c("AC","SL","TA"),
-                 var_labels = c('AC Bins', 'SL Bins', 'TA Bins'), brkpts = brkpts)
+                 var_labels = c('AC Bins','SL Bins', 'TA Bins'), brkpts = brkpts)
 
 plot_breakpoints(data = dat.list, as_date = TRUE, var_names = c("Activity.Count","step","angle"),
-                 var_labels = c('Activity Count', 'Step Length (m)', 'Turning Angle (rad)'),
+                 var_labels = c('Activity Counts','Step Length (m)', 'Turning Angle (rad)'),
                  brkpts = brkpts)
 
 
