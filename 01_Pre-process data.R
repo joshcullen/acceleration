@@ -12,8 +12,8 @@ source('helper functions.R')
 
 
 ### Import Armadillo Acceleration Data ###
-dat<- list.files(pattern = "*.csv") %>% 
-  map_df(~read.csv(.))
+files<- list.files(pattern = "*.csv")[!grepl(pattern = "Armadillo", files)]
+dat<- map_df(files, ~read.csv(.))
 
 
 #inspect data
@@ -264,8 +264,37 @@ ggplot(dat.merged3, aes(angle)) +
 
 
 
+
+## Generate step lengths and turning angles for "Burrow" behavior periods during daytime (only on days GPS is transmitting)
+
+#Remove days where SL & TA data is NA
+filter_by_day = function(data) {
+  cond<- unique(data[which(!is.na(data$step)), "day"])
+  data<- data %>% 
+    dplyr::filter(day %in% cond)
+  
+  data
+}
+
+dat.merged4<- dat.merged3 %>% 
+  mutate(day = yday(date)) %>% 
+  df_to_list(., "id") %>% 
+  map(., filter_by_day) %>% 
+  bind_rows()
+
+
+#Generate 0s for SL and random TA
+is.na.rle <- rle(is.na(dat.merged4[,"step"]))
+is.na.rle$values <- is.na.rle$values & is.na.rle$lengths >= 10  #when >10 consecutive NAs
+ind<- which(inverse.rle(is.na.rle) == TRUE)
+
+dat.merged4[ind, "step"]<- 0
+dat.merged4[ind, "angle"]<- runif(length(ind), min = -pi, max = pi)
+
+
+
 # Assign bins to observations
-dat.list<- df_to_list(dat.merged3, "id")
+dat.list<- df_to_list(dat.merged4, "id")
 dat_disc.list<- map(dat.list,
                        discrete_move_var,
                        lims = list(act.bin.lims, dist.bin.lims, angle.bin.lims),
