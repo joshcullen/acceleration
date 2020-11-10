@@ -109,10 +109,20 @@ theta.estim.long<- expand_behavior(dat = dat, theta.estim = theta.estim, obs = o
                                    nbehav = 2, behav.names = c("High", "Low"),
                                    behav.order = 2:1)
 
+
+
+tol<- 60*24*7  #1 week in mins
+units<- "min"
+# Add gaps when dt > 1 week (in minutes)
+theta.estim.long<- df_to_list(theta.estim.long, "id") %>% 
+  purrr::map(., insert_date_gaps, tol, units) %>% 
+  bind_rows()
+
+
+
 # Plot results
-ggplot(theta.estim.long) +
-  geom_area(aes(x=date, y=prop, fill = behavior), color = "black", size = 0.25,
-            position = "fill") +
+ggplot(theta.estim.long, aes(x = date, ymin = ymin, ymax = ymax, fill = behavior)) +
+  geom_ribbon(color = "black", size = 0.25) +
   labs(x = "\nTime", y = "Proportion of Behavior\n") +
   scale_fill_viridis_d("Behavior") +
   theme_bw() +

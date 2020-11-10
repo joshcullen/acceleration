@@ -9,19 +9,22 @@ library(future)
 ### Import Data ###
 dat<- read.csv("Binned Armadillo Acceleration Data.csv", as.is = T)
 dat$date<- as_datetime(dat$date)
+dat$day = yday(dat$date)
+
 dat.list<- df_to_list(dat, "id")
 
-# #Remove days where SL & TA data is NA
-# filter_by_day = function(data) {
-#   cond<- unique(data[which(!is.na(data$SL)), "day"])
-#   data<- data %>% 
-#     filter(day %in% cond)
-#   
-#   data
-# }
-# 
-# dat.list<- df_to_list(dat, "id") %>% 
-#   map(., filter_by_day)
+
+#Remove days where SL & TA data is NA
+filter_by_day = function(data) {
+  cond<- unique(data[which(!is.na(data$SL)), "day"])
+  data<- data %>%
+    filter(day %in% cond)
+
+  data
+}
+
+dat.list<- df_to_list(dat, "id") %>%
+  map(., filter_by_day)
 
 # Only retain id and discretized data streams
 dat.list2<- map(dat.list, subset, select = c(id, AC, SL, TA))
@@ -42,9 +45,8 @@ plan(multisession)  #run all MCMC chains in parallel
 dat.res<- segment_behavior(data = dat.list2, ngibbs = ngibbs, nbins = nbins, alpha = alpha,
                            breakpt = breaks)
 future:::ClusterRegistry("stop")  #close all threads and memory used
-# takes 37 min to run 20000 iterations
+# takes 56 min to run 20000 iterations
 # takes 5 min for only SL and TA data
-# takes 56 min for filtered AC, SL, TA data to run 20000 iterations
 
 
 # Trace-plots for the number of breakpoints and LML
