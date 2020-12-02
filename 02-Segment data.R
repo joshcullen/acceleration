@@ -9,26 +9,67 @@ library(future)
 ### Import Data ###
 dat<- read.csv("Binned Armadillo Acceleration Data.csv", as.is = T)
 dat$date<- as_datetime(dat$date)
-dat$day = yday(dat$date)
+# dat$day = yday(dat$date)
 
+#Fix time1 var if not sequential after prior filtering steps
+for (i in 1:dplyr::n_distinct(dat$id)) {
+  ind<- which(dat$id == unique(dat$id)[i])
+  
+  if (dplyr::n_distinct(diff(dat[ind,]$time1)) > 1) 
+    dat[ind,]$time1<- seq(1, length(ind))
+}
+
+
+#Create list
 dat.list<- df_to_list(dat, "id")
 
 
-#Remove days where SL & TA data is NA
-filter_by_day = function(data) {
-  cond<- unique(data[which(!is.na(data$SL)), "day"])
-  data<- data %>%
-    filter(day %in% cond)
 
-  data
-}
+# #Remove days where SL & TA data is NA
+# filter_by_day = function(data) {
+#   
+#   data.list<- df_to_list(data, "id")
+#   dat.in<- list()  #data kept in for segmentation model
+#   dat.out<- list()  #data held out for prediction
+#   
+#   for (i in 1:length(data.list)) {
+#     cond<- unique(data.list[[i]][which(!is.na(data.list[[i]]$SL)), "day"])
+#     
+#     dat.in[[i]]<- data.list[[i]] %>%
+#       filter(day %in% cond)
+#     dat.out[[i]]<- data.list[[i]] %>%
+#       filter(!day %in% cond)
+#   }
+# 
+#   # dat.in<- bind_rows(dat.in)
+#   # dat.out<- bind_rows(dat.out)
+#   names(dat.in)<- names(dat.out)<- names(data.list)
+#   
+#   list(train = dat.in, test = dat.out)
+# }
+# 
+# 
+# dat.filt<- filter_by_day(data = dat)
+# 
+# #Compare AC distribs between train and test data
+# tmp<- map(dat.filt, bind_rows) %>% 
+#   map2(., c("train","test"), ~mutate(.x, type = .y)) %>% 
+#   bind_rows()
+# 
+# ggplot(tmp, aes(Activity.Count)) +
+#   geom_histogram() +
+#   theme_bw() +
+#   labs(x = "Activity Count", y = "Count") +
+#   theme(axis.title = element_text(size = 16),
+#         axis.text = element_text(size = 12),
+#         strip.text = element_text(size = 14, face = "bold")) +
+#   facet_wrap(~type, scales = "free_y")
 
-dat.list<- df_to_list(dat, "id") %>%
-  map(., filter_by_day)
+
 
 # Only retain id and discretized data streams
+# dat.list2<- map(dat.filt$train, subset, select = c(id, AC, SL, TA))
 dat.list2<- map(dat.list, subset, select = c(id, AC, SL, TA))
-
 
 
 ### Run Segmentation Model ###
@@ -37,7 +78,7 @@ set.seed(1)
 
 alpha<- 1
 ngibbs<- 20000
-nbins<- c(5,5,8)
+nbins<- c(6,6,8)
 breaks<- map(dat.list, ~find_breaks(., "day"))
 
 
@@ -45,8 +86,9 @@ plan(multisession)  #run all MCMC chains in parallel
 dat.res<- segment_behavior(data = dat.list2, ngibbs = ngibbs, nbins = nbins, alpha = alpha,
                            breakpt = breaks)
 future:::ClusterRegistry("stop")  #close all threads and memory used
-# takes 56 min to run 20000 iterations
+# takes 21 min to run 10000 iterations
 # takes 5 min for only SL and TA data
+# takes 3.5 min on highly filtered data
 
 
 # Trace-plots for the number of breakpoints and LML

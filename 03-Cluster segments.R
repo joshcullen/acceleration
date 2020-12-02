@@ -14,7 +14,7 @@ dat$date<- as_datetime(dat$date)
 dat2<- dat[,c("id","tseg","AC","SL","TA")]
 
 # Summarize observations by track segment
-nbins<- c(5,5,8)
+nbins<- c(6,6,8)
 obs<- summarize_tsegs(dat = dat2, nbins = nbins)
 head(obs)
 
@@ -39,7 +39,7 @@ alpha<- 0.1
 res<- cluster_segments(dat=obs, gamma1=gamma1, alpha=alpha,
                        ngibbs=ngibbs, nmaxclust=nmaxclust,
                        nburn=nburn, ndata.types=ndata.types)
-# takes 58 s to run on 1000 iterations
+# takes 1 min to run on 1000 iterations
 # takes 12 s to run using only SL and TA
 
 # Check traceplot of log likelihood
@@ -76,7 +76,7 @@ ggplot(theta.estim_df, aes(behavior, prop)) +
 (theta.means<- round(colMeans(theta.estim), digits = 3))
 
 # Calculate cumulative sum
-cumsum(theta.means)  #first 2 clusters account for 93.8% of obs; stick with these
+cumsum(theta.means)  #first 3 clusters account for 99% of obs; stick with these
 
 
 
@@ -95,7 +95,7 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
         axis.text.x.bottom = element_text(size = 12),
         strip.text = element_text(size = 14),
         strip.text.x = element_text(face = "bold")) +
-  scale_fill_manual(values = c(viridis::viridis(2),"grey35",
+  scale_fill_manual(values = c(viridis::viridis(3),
                                "grey35","grey35","grey35","grey35"), guide = FALSE) +
   scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
   scale_x_continuous(breaks = 1:8) +
@@ -106,8 +106,8 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
 
 # Reformat proportion estimates for all track segments
 theta.estim.long<- expand_behavior(dat = dat, theta.estim = theta.estim, obs = obs,
-                                   nbehav = 2, behav.names = c("High", "Low"),
-                                   behav.order = 2:1)
+                                   nbehav = 3, behav.names = c("High", "Low", "Lowest"),
+                                   behav.order = 1:3)
 
 
 
@@ -145,8 +145,8 @@ dat.list<- df_to_list(dat = dat, ind = "id")
 dat.out<- assign_behavior(dat.orig = dat,
                              dat.seg.list = dat.list,
                              theta.estim.long = theta.estim.long,
-                             behav.names = c("Low","High"))
-dat.out$behav<- factor(dat.out$behav, levels = c("Low", "High"))
+                             behav.names = c("High","Low","Lowest"))
+# dat.out$behav<- factor(dat.out$behav, levels = c("Low", "High"))
 
 
 
