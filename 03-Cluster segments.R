@@ -107,21 +107,20 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
 # Reformat proportion estimates for all track segments
 theta.estim.long<- expand_behavior(dat = dat, theta.estim = theta.estim, obs = obs,
                                    nbehav = 3, behav.names = c("High", "Low", "Lowest"),
-                                   behav.order = 1:3)
-
+                                   behav.order = 3:1)
 
 
 tol<- 60*24*7  #1 week in mins
 units<- "min"
 # Add gaps when dt > 1 week (in minutes)
-theta.estim.long<- df_to_list(theta.estim.long, "id") %>% 
+theta.estim.long2<- df_to_list(theta.estim.long, "id") %>% 
   purrr::map(., insert_date_gaps, tol, units) %>% 
   bind_rows()
 
 
 
 # Plot results
-ggplot(theta.estim.long, aes(x = date, ymin = ymin, ymax = ymax, fill = behavior)) +
+ggplot(theta.estim.long2, aes(x = date, ymin = ymin, ymax = ymax, fill = behavior)) +
   geom_ribbon(color = "black", size = 0.25) +
   labs(x = "\nTime", y = "Proportion of Behavior\n") +
   scale_fill_viridis_d("Behavior") +
@@ -138,14 +137,19 @@ ggplot(theta.estim.long, aes(x = date, ymin = ymin, ymax = ymax, fill = behavior
 
 ### Merge results, visualize, and export ###
 
+# Load 'original' cleaned data
+dat.orig<- read.csv("Binned Armadillo Acceleration Data.csv", as.is = T)
+# dat.orig$obs<- dat.orig$time1 
+
 # Convert segmented dataset into list
+# dat$obs<- dat$time1
 dat.list<- df_to_list(dat = dat, ind = "id")
 
 # Merge results with original data
-dat.out<- assign_behavior(dat.orig = dat,
+dat.out<- assign_behavior(dat.orig = dat.orig,
                              dat.seg.list = dat.list,
                              theta.estim.long = theta.estim.long,
-                             behav.names = c("High","Low","Lowest"))
+                             behav.names = c("Lowest","Low","High"))
 # dat.out$behav<- factor(dat.out$behav, levels = c("Low", "High"))
 
 
@@ -177,3 +181,11 @@ ggplot() +
   facet_wrap(~id, scales = "free")
 
 
+
+## Explore in Shiny
+
+dat.out$date<- as_datetime(dat.out$date)
+dat.out2<- filter(dat.out, !is.na(x))
+dat.out2$behav<- as.numeric(dat.out2$behav)
+
+shiny_tracks(dat.out2, 32721)
