@@ -6,6 +6,9 @@ library(tidyverse)
 library(lubridate)
 library(future)
 
+source('helper functions.R')
+
+
 ### Import Data ###
 dat<- read.csv("Binned Armadillo Acceleration Data.csv", as.is = T)
 dat$date<- as_datetime(dat$date)
@@ -23,6 +26,9 @@ for (i in 1:dplyr::n_distinct(dat$id)) {
 #Create list
 dat.list<- df_to_list(dat, "id")
 
+#Determine active period
+dat.list<- dat.list %>% 
+  map(., nocturnal_period)
 
 
 # #Remove days where SL & TA data is NA
@@ -79,14 +85,14 @@ set.seed(1)
 alpha<- 1
 ngibbs<- 20000
 nbins<- c(6,6,8)
-breaks<- map(dat.list, ~find_breaks(., "day"))
+breaks<- map(dat.list, ~find_breaks(., "period"))
 
 
 plan(multisession)  #run all MCMC chains in parallel
 dat.res<- segment_behavior(data = dat.list2, ngibbs = ngibbs, nbins = nbins, alpha = alpha,
                            breakpt = breaks)
 future:::ClusterRegistry("stop")  #close all threads and memory used
-# takes 21 min to run 10000 iterations
+# takes 55 min to run 20000 iterations
 # takes 5 min for only SL and TA data
 # takes 3.5 min on highly filtered data
 

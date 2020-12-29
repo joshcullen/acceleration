@@ -56,7 +56,7 @@ theta.estim<- extract_prop(res = res, ngibbs = ngibbs, nburn = nburn, nmaxclust 
 # Convert to data frame for ggplot2
 theta.estim_df<- theta.estim %>%
   as.data.frame() %>%
-  pivot_longer(., cols = 1:nmaxclust, names_to = "behavior", values_to = "prop") %>%
+  pivot_longer(., cols = 1:all_of(nmaxclust), names_to = "behavior", values_to = "prop") %>%
   modify_at("behavior", factor)
 levels(theta.estim_df$behavior)<- 1:nmaxclust
 
@@ -76,7 +76,7 @@ ggplot(theta.estim_df, aes(behavior, prop)) +
 (theta.means<- round(colMeans(theta.estim), digits = 3))
 
 # Calculate cumulative sum
-cumsum(theta.means)  #first 3 clusters account for 99% of obs; stick with these
+cumsum(theta.means)  #first 2 clusters account for 94% of obs; stick with these
 
 
 
@@ -95,7 +95,7 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
         axis.text.x.bottom = element_text(size = 12),
         strip.text = element_text(size = 14),
         strip.text.x = element_text(face = "bold")) +
-  scale_fill_manual(values = c(viridis::viridis(3),
+  scale_fill_manual(values = c(viridis::viridis(2), "grey35",
                                "grey35","grey35","grey35","grey35"), guide = FALSE) +
   scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
   scale_x_continuous(breaks = 1:8) +
@@ -106,22 +106,21 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = as.factor(behav))) +
 
 # Reformat proportion estimates for all track segments
 theta.estim.long<- expand_behavior(dat = dat, theta.estim = theta.estim, obs = obs,
-                                   nbehav = 3, behav.names = c("High", "Low", "Lowest"),
-                                   behav.order = 3:1)
+                                   nbehav = 2, behav.names = c("High", "Low"),
+                                   behav.order = 2:1)
 
 
 tol<- 60*24*7  #1 week in mins
 units<- "min"
 # Add gaps when dt > 1 week (in minutes)
-theta.estim.long2<- df_to_list(theta.estim.long, "id") %>% 
-  purrr::map(., insert_date_gaps, tol, units) %>% 
-  bind_rows()
+theta.estim.long2<- insert_NAs(data = theta.estim.long, int = 7, units = "mins")
 
 
 
 # Plot results
-ggplot(theta.estim.long2, aes(x = date, ymin = ymin, ymax = ymax, fill = behavior)) +
-  geom_ribbon(color = "black", size = 0.25) +
+ggplot(theta.estim.long) +
+  geom_area(aes(x=date, y=prop, fill = behavior), color = "black", size = 0.25,
+              position = "fill") +
   labs(x = "\nTime", y = "Proportion of Behavior\n") +
   scale_fill_viridis_d("Behavior") +
   theme_bw() +
@@ -149,7 +148,7 @@ dat.list<- df_to_list(dat = dat, ind = "id")
 dat.out<- assign_behavior(dat.orig = dat.orig,
                              dat.seg.list = dat.list,
                              theta.estim.long = theta.estim.long,
-                             behav.names = c("Lowest","Low","High"))
+                             behav.names = c("Low","High"))
 # dat.out$behav<- factor(dat.out$behav, levels = c("Low", "High"))
 
 

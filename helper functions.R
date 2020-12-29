@@ -35,50 +35,36 @@ tmp.GPS
 
 #----------------------------------------
 
-fill_NA = function(data, int, units = "min") {
-  # dt must be in minutes until I make updates to allow other units
-  # units must be "min" for now
+nocturnal_period = function(dat) {
+  #identify active period for nocturnal animals (who are active on 2 ydays)
   
-  dat.list<- bayesmove::df_to_list(data, "id")
+  dat$period<- NA
+  date1<- unique(as.Date(dat$date))
   
-  dat.list<- purrr::map(dat.list, ~{
+  if (sum(dat$date < (date1[1] + lubridate::hours(12))) >= 1) {
+    tmp<- which(dat$date < (date1[1] + lubridate::hours(12)))
+    dat[tmp, "period"]<- 1
     
-    dat<- data.frame(.)
-    ind<- which(!is.na(dat$dt) & dat$dt > int)
-    ind2<- ind - 1
+    oo<- 1
+  } else {
     
-    for (i in 1:length(ind)) {
-      if (dat$dt[ind[i]] >= 2*int & dat$dt[ind[i]] < 7*24*60) {
-        
-        # cond<- dat$dt[ind[i]] %% int == 0  #check if dt is multiple of int
-        vec.length<- floor(dat$dt[ind[i]]/int)  #find multiple of int in dt to determine seq length
-        seq.dates<- seq(dat$date[ind2[i]], dat$date[ind[i]], by = paste(int, units))[1:vec.length]
-        tmp1<- as.data.frame(lapply(dat[ind2[i],], rep, length(seq.dates)))
-        tmp1$date<- seq.dates
-        tmp1$dt<- int
-        
-        dat[seq(ind2[i]+vec.length, nrow(dat)+vec.length-1),]<- dat[ind[i]:nrow(dat),]
-        dat[ind2[i]:(ind2[i]+vec.length-1),]<- tmp1
-        
-        ind<- ind + (vec.length - 1)  #update index
-        ind2<- ind2 + (vec.length - 1)  #update index
-        
-      } else {
-        dat<- dat
-      }
-    }
-    
-    
-    #update dt column and remove any duplicate rows
-    dat$dt<- as.numeric(difftime(dat$date, lag(dat$date), units = "min"))
-    dat<- dplyr::distinct(dat, date, .keep_all = TRUE)
-    
-    dat
-    })
+    oo<- 0
+  }
   
-  dat.out<- dplyr::bind_rows(dat.list)
   
-  dat.out
+  for (i in 2:length(date1)) {
+    ind<- which(dat$date > (date1[i-1] + lubridate::hours(12)) &
+                  dat$date < (date1[i] + lubridate::hours(12)))
+    
+    dat[ind, "period"]<- i-1+oo
+  }
+  
+  if (any(diff(unique(dat$period)) > 1)) {  #if not consecutive, make it so
+    dat$period<- as.numeric(factor(dat$period))
+  }
+    
+  
+  dat
 }
 
 

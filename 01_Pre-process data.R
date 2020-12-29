@@ -44,8 +44,9 @@ dat.AC<- dat2 %>%
   group_split(id) %>% 
   map(., arrange, Acquisition.Time) %>%  #reorder rows by Acquisition.Time
   map(., distinct, Acquisition.Time, .keep_all = T) %>% #remove duplicate rows
-  map(., ~mutate(., dt = difftime(Acquisition.Time, Acquisition.Start.Time, units = "min"),
-                 .before = Activity.Count)) %>% 
+  map(., ~mutate(., dt = as.numeric(difftime(Acquisition.Time, Acquisition.Start.Time,
+                                             units = "min")),
+                 .before = Activity.Count)) %>%
   bind_rows()
 
 table(dat.AC$dt)  #all but 4 of 140166 (0.004%) are at 5 min interval
@@ -56,22 +57,25 @@ dat.AC.filt<- filter_time(dat.AC.list, int = 5)
 
 #create data frame for activity counts and add dt column (units as min)
 dat.GPS<- dat2 %>% 
-  filter(is.na(Activity.Count)) %>%  #remove rows where AC is NA
+  filter(is.na(Activity.Count)) %>%  #remove rows where AC is not NA
   group_split(id) %>% 
   map(., arrange, Acquisition.Start.Time) %>%  #reorder rows by Acquisition.Time
   map(., distinct, Acquisition.Start.Time, .keep_all = T) %>% #remove duplicate rows
-  map(., ~mutate(., dt = as.numeric(difftime(Acquisition.Start.Time, lag(Acquisition.Start.Time),
-                                             units = "min")),
+  map(., ~mutate(., dt = c(as.numeric(difftime(Acquisition.Start.Time,
+                                             dplyr::lag(Acquisition.Start.Time),
+                                             units = "min"))[-1], NA),
                  .before = Activity.Count)) %>%
   bind_rows() %>% 
-  dplyr::select(-date) %>% 
+  dplyr::select(-date) %>%
   rename(date = Acquisition.Start.Time)
+
+
 
 
 # Fill in large time gaps with NA and round times
 dat.GPS<- dat.GPS %>% 
-  fill_NA(data = ., int = 7) %>% 
-  round_track_time(dat = ., id = "id", int = 7, tol = 1)  #round dt
+  insert_NAs(data = ., int = 7, units = "min") %>% 
+  round_track_time(dat = ., id = "id", int = 7, tol = 1, units = "mins")  #round dt
 table(dat.GPS$dt)  #all but 554 of 99282 (0.56%) are at 7 min interval; most others are at 12 min interval
 
 
@@ -87,11 +91,11 @@ plan(multisession)
 tic()
 dat.merged<- future_map2(dat.AC.filt, dat.GPS.filt,
                   ~merge_ac_gps(data.AC = .x, data.GPS = .y, tol = 1),
-                  .progress = TRUE, .options = future_options(seed = TRUE)) %>% 
+                  .progress = TRUE, .options = furrr_options(seed = TRUE)) %>% 
   bind_rows()
 toc()
 future:::ClusterRegistry("stop")  #close all threads and memory used
-# takes 14 s to run for 99290 GPS observations
+# takes 32 s to run for 190226 GPS observations
 
 
 
@@ -226,13 +230,13 @@ cond1<- c(which(dat.merged3$id == "blanca" &
                 dat.merged3$date <= as.POSIXct("2019-12-15 0:00:00", tz="UTC")))
 
 cond2<- which(dat.merged3$Activity.Count == 0 & dat.merged3$step > 0 | dat.merged3$angle == 0)
-cond3<- which(dat.merged3$step == 0 & dat.merged3$angle == 0)
+# cond3<- which(dat.merged3$step == 0 & dat.merged3$angle == 0)
 # cond4<- which(!is.na(dat.merged3$Activity.Count) & is.na(dat.merged3$step) & 
 #                 is.na(dat.merged3$angle))
-# cond5<- which(is.na(dat.merged3$Activity.Count) & is.na(dat.merged3$step) & 
-#                 is.na(dat.merged3$angle))
+cond5<- which(is.na(dat.merged3$Activity.Count) & is.na(dat.merged3$step) &
+                is.na(dat.merged3$angle))
 
-cond<- sort(unique(c(cond1, cond2, cond3)))
+cond<- sort(unique(c(cond1, cond2, cond5)))
 dat.merged4<- dat.merged3[-cond,]
 
 
@@ -250,7 +254,7 @@ ggplot(data = dat.merged4, aes(x, y)) +
 # looks generally the same as before, but w/o spurious relocations
 
 
-# Viz distribution and time series of step lengths
+# Viz distribution and time series of activity counts
 ggplot(dat.merged4, aes(Activity.Count)) +
   geom_density(aes(fill = id)) +
   theme_bw() +
@@ -289,7 +293,7 @@ ggplot() +
 
 
 
-## Originally started w/ 140166 activity count obs and 18433 GPS obs, which was filtered to retain a total of 57643 obs
+## Originally started w/ 140166 activity count obs and 18433 GPS obs, which was filtered to retain a total of 57239 obs
 
 
 
