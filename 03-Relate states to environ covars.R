@@ -202,7 +202,7 @@ for (i in 1:nlayers(ndwi)) {
 # Merge extracted covariates to dat
 dat2<- cbind(dat, extr.lulc2, ndwi = extr.ndwi)
 
-
+PerformanceAnalytics::chart.Correlation(dat2[,16:20])
 
 
 
