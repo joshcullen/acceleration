@@ -24,18 +24,15 @@ knitr::opts_chunk$set(echo = FALSE,
 
 While there has been an increased effort to understand the movement and spatial ecology of giant armadillos within the Brazilian Pantanal, quantitative measures of latent behavioral states and their relationships with environmental covariates have not yet been evaluated. The estimation of latent behavioral states from animal telemetry data is useful to elucidate what behaviors individuals are performing over time and how they correspond with different environmental features over space and time. Latent behavioral states are often estimated by evaluating the measures of step lengths and turning angles of a set of tracks using hidden Markov models (HMMs), although there are some limitations to this approach. A recent method developed by Valle et al. (in review) uses a non-parametric Bayesian mixture model with a penalized prior to estimate the optimal number of behavioral states, the associated state-dependent distributions for each state, and the state estimates for each observation of the tracks. These can be evaluated using any set of data streams recorded by the tag or metrics derived from the track itself (e.g., step lengths, turning angles, accelerometer data). This mixture model was used to estimate the latent behavioral states from giant armadillos to assess how this species interacts with its environment in the Brazilian Pantanal.
 
-
 # Methods
 
 ## Data prep
-Movement data were available for 7 individuals (blanca, emanuel, gala, mafalda, mazeboti, sara, tex) from 2019 – 2020. A sample size of N = 18,433 total GPS locations and N = 140,162 total activity count measurements were analyzed from all 7 IDs. The tags recorded activity counts (i.e., the changes in the x, y, or z axes over a 5 min duration) and GPS positions, which were used to calculate step lengths and turning angles. These movement data were heavily filtered to remove error-prone measurements that could bias the results. This included the removal of aberrant locations due to low satellite coverage ($\leq$ 4 satellites), step lengths that were larger than possible ($>$ 800 m; 99th quantile), and when activity counts were equal to zero. Since activity counts were recorded at 5 min intervals and GPS locations were recorded at 7 min intervals, activity counts were only retained when sampled at a time $\leq$ 1 min different from the GPS tag. Additionally, GPS positions were filtered to only include observations sampled at 7 $\pm$ 1 min. Step lengths were then converted to speed by dividing by the time step (i.e., 7 min). After all filtering steps, a total of 9,948 observations were retained for further analysis. Next, speed, turning angles, and activity counts were discretized into bins for analysis by the non-parametric Bayesian mixture model.\newline
 
+Movement data were available for 7 individuals (blanca, emanuel, gala, mafalda, mazeboti, sara, tex) from 2019 -- 2020. A sample size of N = 18,433 total GPS locations and N = 140,162 total activity count measurements were analyzed from all 7 IDs. The tags recorded activity counts (i.e., the changes in the x, y, or z axes over a 5 min duration) and GPS positions, which were used to calculate step lengths and turning angles. These movement data were heavily filtered to remove error-prone measurements that could bias the results. This included the removal of aberrant locations due to low satellite coverage ($\leq$ 4 satellites), step lengths that were larger than possible ($>$ 800 m; 99th quantile), and when activity counts were equal to zero. Since activity counts were recorded at 5 min intervals and GPS locations were recorded at 7 min intervals, activity counts were only retained when sampled at a time $\leq$ 1 min different from the GPS tag. Additionally, GPS positions were filtered to only include observations sampled at 7 $\pm$ 1 min. Step lengths were then converted to speed by dividing by the time step (i.e., 7 min). After all filtering steps, a total of 9,948 observations were retained for further analysis. Next, speed, turning angles, and activity counts were discretized into bins for analysis by the non-parametric Bayesian mixture model.\newline
 
 Activity counts ranged from 1 to 300 and were discretized into 6 bins of equal width. Speed ranged from 0 to 2.13 m/s and was discretized into 7 bins. Since 99% of speed observations were recorded below 1 m/s, 6 bins of equal width were used to discretize speed from 0 to 1 m/s. All observations greater than 1 m/s (up to 2.13 m/s) were assigned to the 7th bin. Turning angles ranged from $-\pi$ to $\pi$ radians and were discretized into 10 bins of equal width. Plots of continuous and discretized distributions are shown below. Additionally a plot of filtered tracks for each ID is also included for spatial context.
 
-\  
-\  
-
+   
 
 ```{r}
 library(tidyverse)
@@ -44,7 +41,7 @@ library(raster)
 library(viridis)
 library(sf)
 library(ks)
-library(cowplot)
+
 
 dat<- read.csv('Giant Armadillo state estimates.csv', as.is = T)
 dat$date<- as_datetime(dat$date, tz = "UTC")
@@ -174,19 +171,17 @@ ggplot(data = param.prop %>% filter(var == "act.cat"), aes(value, prop)) +
   
 ```
 
-
 ## Clustering observations into latent behavioral states
-Filtered data were analyzed by a non-parametric Bayesian mixture model using the `cluster_obs()` function in the *bayesmove* package in R. This model clusters observations pooled across all individual tracks into a finite number of latent behavioral states. Through the use of a penalizing prior, we can set the maximum number of possible states and the model will prefer to assign observations to a fewer number of clusters/states. This clustering was performed using the bin labels for all three data streams (i.e., activity counts, speed, and turning angles) from all 9,948 observations where the maximum number of clusters was set equal to 10. We ran a Gibbs sampler using Markov chain Monte Carlo (MCMC) with 20,000 iterations where the first 10,000 iterations were treated as the burn-in and the second 10,000 iterations constituted the posterior.\newline
 
+Filtered data were analyzed by a non-parametric Bayesian mixture model using the `cluster_obs()` function in the *bayesmove* package in R. This model clusters observations pooled across all individual tracks into a finite number of latent behavioral states. Through the use of a penalizing prior, we can set the maximum number of possible states and the model will prefer to assign observations to a fewer number of clusters/states. This clustering was performed using the bin labels for all three data streams (i.e., activity counts, speed, and turning angles) from all 9,948 observations where the maximum number of clusters was set equal to 10. We ran a Gibbs sampler using Markov chain Monte Carlo (MCMC) with 20,000 iterations where the first 10,000 iterations were treated as the burn-in and the second 10,000 iterations constituted the posterior.\newline
 
 The number of latent states was identified by inspecting the average proportion of observations assigned to each cluster/state as well as the state-dependent distributions of activity counts, speed, and turning angles. Once the states were defined, the posterior estimates of state assignments for each observation were evaluated. To ensure that there was high certainty with the assigned behavioral state for a given observation, $\geq$ 75% of all posterior estimates needed to belong to a single state. If none of the states for a given observation fell above this threshold, the observation was labeled as "Unclassified".
 
-
 ## Extraction of environmental covariates
-To relate the estimated behavioral states to giant armadillo habitat, environmental covariates were extracted at each location. This included land use/land cover (LU/LC) as well as normalized difference water index (NDWI), a measure of the wetness of a location. The LU/LC data was obtained from ICAS and consisted of four land classes: Forest, Closed Savanna, Open Savanna, and Floodable. These data were stored at a 30 m spatial resolution with as a static variable (i.e., it did not change over time). NDWI was derived from Landsat 8 imagery for the time period for which the giant armadillos were transmitting (May 2019 to January 2020). These were downloaded at a spatial resolution of 30 m, but were aggregated to an average seasonal layer to minimize data missingness due cloud cover.\newline
 
+To relate the estimated behavioral states to giant armadillo habitat, a number of environmental covariates were extracted at each location. This included land use/land cover (LU/LC), normalized difference vegetation index (NDVI), normalized difference water index (NDWI), elevation, and Tasseled Cap Transformations of Landsat imagery (brightness, greenness, wetness). Tasseled Cap brightness, greenness, and wetness were calculated as possible alternatives to LU/LC and NDVI/NDWI since they are orthogonal metrics intended to represent bare ground, vegetation productivity, and soil moisture, respectively. The LU/LC data was obtained from ICAS and consisted of four land classes: Forest, Closed Savanna, Open Savanna, and Floodable. These data were stored at a 30 m spatial resolution with as a static variable (i.e., it did not change over time). Elevation was downloaded for the study region using the *elevatr* R package at 18 m resolution, but was resampled to 30 m to match the other covariates. NDVI, NDWI, brightness, greenness, and wetness were derived from Landsat 8 imagery over the time period for which the giant armadillos were transmitting (May 2019 to January 2020). These were downloaded at a spatial resolution of 30 m, but were aggregated to an average seasonal layer to minimize data missingness due cloud cover.\newline
 
-Environmental covariates were extracted using a 30 m buffer around each GPS position. This was performed to account for possible location error from the tag and capture any local heterogeneity in the habitat for a given location. Since LU/LC is a discrete variable, the proportion of land classes was calculated for each position, whereas the mean NDWI was calculated since it is a continuous variable.
+Environmental covariates were extracted using a 30 m buffer around each GPS position. This was performed to account for possible location error from the tag and capture any local heterogeneity in the habitat for a given location. Since LU/LC is a discrete variable, the proportion of land classes was calculated for each position. The mean was calculated for all other covariates since they are continuous variables.
 
 ```{r map_covars}
 
@@ -215,7 +210,64 @@ ndwi.df<- as.data.frame(ndwi, xy = T)
 ndwi.df2<- pivot_longer(ndwi.df, cols = -c(x,y), names_to = "season", values_to = "ndwi")
 ndwi.df2$season<- factor(ndwi.df2$season, levels = names(ndwi))
 
+
+
+#NDVI
+
+ndvi<- brick('GiantArm_ndvi_season.grd')
+ndvi<- resample(ndvi, lulc, method = "bilinear")
+# compareRaster(lulc, ndvi)
+
+ndvi.df<- as.data.frame(ndvi, xy = T)
+ndvi.df2<- pivot_longer(ndvi.df, cols = -c(x,y), names_to = "season", values_to = "ndvi")
+ndvi.df2$season<- factor(ndvi.df2$season, levels = names(ndvi))
+
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/acceleration")
+
+
+
+#Tasseled Cap Brightness
+
+bright<- brick('GiantArm_tcbright_season.grd')
+bright<- resample(bright, lulc, method = "bilinear")
+# compareRaster(lulc, bright)
+
+bright.df<- as.data.frame(bright, xy = T)
+bright.df2<- pivot_longer(bright.df, cols = -c(x,y), names_to = "season", values_to = "bright")
+bright.df2$season<- factor(bright.df2$season, levels = names(bright))
+
+
+
+#Tasseled Cap Greenness
+
+green<- brick('GiantArm_tcgreen_season.grd')
+green<- resample(green, lulc, method = "bilinear")
+# compareRaster(lulc, green)
+
+green.df<- as.data.frame(green, xy = T)
+green.df2<- pivot_longer(green.df, cols = -c(x,y), names_to = "season", values_to = "green")
+green.df2$season<- factor(green.df2$season, levels = names(green))
+
+
+
+#Tasseled Cap Wetness
+
+wet<- brick('GiantArm_tcwet_season.grd')
+wet<- resample(wet, lulc, method = "bilinear")
+# compareRaster(lulc, wet)
+
+wet.df<- as.data.frame(wet, xy = T)
+wet.df2<- pivot_longer(wet.df, cols = -c(x,y), names_to = "season", values_to = "wet")
+wet.df2$season<- factor(wet.df2$season, levels = names(wet))
+
+
+
+#Elevation
+dem<- raster('giantarm_dem.tif')
+names(dem)<- 'elev'
+dem<- resample(dem, lulc, method = "bilinear")
+# compareRaster(lulc, dem)
+dem.df<- as.data.frame(dem, xy = TRUE)
 
 
 #map LU/LC
@@ -253,13 +305,99 @@ ggplot() +
         legend.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold")) +
   facet_wrap(~ season)
-```
 
+#map NDVI
+ggplot() +
+  geom_raster(data = ndvi.df2, aes(x, y, fill = ndvi)) +
+  scale_fill_distiller("NDVI", palette = "RdYlGn", na.value = "transparent", limits = c(-1,1),
+                       direction = 1) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "right",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold")) +
+  facet_wrap(~ season)
+
+#map TC Brightness
+ggplot() +
+  geom_raster(data = bright.df2, aes(x, y, fill = bright)) +
+  scale_fill_distiller("Brightness", palette = "Reds", na.value = "transparent",
+                       limits = c(0,10000), direction = 1) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "right",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold")) +
+  facet_wrap(~ season)
+
+#map TC Greenness
+ggplot() +
+  geom_raster(data = green.df2, aes(x, y, fill = green)) +
+  scale_fill_distiller("Greenness", palette = "Greens", na.value = "transparent",
+                       limits = c(-2000,5000), direction = 1) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "right",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold")) +
+  facet_wrap(~ season)
+
+#map TC Wetness
+ggplot() +
+  geom_raster(data = wet.df2, aes(x, y, fill = wet)) +
+  scale_fill_distiller("Wetness", palette = "Blues", na.value = "transparent",
+                       limits = c(-5000,250), direction = 1) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "right",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold")) +
+  facet_wrap(~ season)
+
+#map elevation
+ggplot() +
+  geom_raster(data = dem.df, aes(x, y, fill = elev)) +
+  scale_fill_viridis_c("Elevation (m)", na.value = "transparent") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "right",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"))
+```
 
 ## Comparison of habitat use among behavioral states
 
-To quantify the differences in relationships with LU/LC and NDWI among behavioral states, logistic regressions were performed to evaluate pairwise differences. These logistic regressions included the proportion of each land class, NDWI, and armadillo ID as covariates. Closed Savanna and blanca were treated as reference classes (part of intercept). For quick visualization of the model's estimates, coefficients for each of the remaining land classes (Forest, Open Savanna, Floodable) and NDWI were plotted as odds ratios with 95% confidence intervals. This was performed for each pairwise comparison of states.
-
+To quantify the differences in relationships with environmental covariates among behavioral states, logistic regressions were performed to evaluate pairwise differences. Due to high correlations among some of the variables, **only elevation, greenness, and wetness** were included in subsequent analyses. Additionally, armadillo ID was also included as a covariate within the logistic regressions. Blanca was treated as reference class (part of intercept) for animal ID. For quick visualization of the model results, coefficients from each model comparison were plotted as odds ratios with 95% confidence intervals. This was performed for each pairwise comparison of states.
 
 # Results
 
@@ -289,9 +427,7 @@ ggplot(behav.res, aes(x = bin, y = prop, fill = behav)) +
   facet_grid(behav ~ var, scales = "free_x")
 ```
 
-
 Given my limited background in the behavioral ecology of giant armadillos, behavioral states are given preliminary names that can be later modified. For now, they are identified as 'Slow-Turn', 'Slow-Uniform', 'Exploratory', and 'Transit'. The 'Slow-Turn' state is characterized by relatively lower activity counts, low speed, and high turning angles (near $-\pi/\pi$ radians). The 'Slow-Uniform' state is nearly identical to the 'Slow-Turn' state for distributions of activity counts and speed, but has a more uniform distribution of turning angles. The 'Exploratory' state is characterized by higher activity counts, greater speed, and lower turning angles (near 0 radians) than either the 'Slow-Turn' or 'Slow-Uniform' states. Lastly, the 'Transit' state exhibits the greatest activity counts, greatest speeds, and lowest turning angles.\newline
-
 
 A quick inspection of the plotted behavioral states provides an idea of their spatial configuration for each individual:
 
@@ -314,12 +450,11 @@ ggplot(dat, aes(x, y, color = z.post.thresh)) +
 
 ```
 
-
 ## Exploratory data analysis
 
-Below is an example of a track segment where LU/LC and NDWI would be extracted within 30 m of a given observation. Based on these values, as well as other characteristics of the data, we can summarize the data a few different ways to explore any obvious underlying spatiotemporal patterns for the behavioral states.
+Below is an example of a track segment where LU/LC and elevation would be extracted within 30 m of a given observation. Based on these values, as well as other characteristics of the data, we can summarize the data a few different ways to explore any obvious underlying spatiotemporal patterns for the behavioral states.
 
-```{r covar_extr_ex, dev='png', dpi=300, fig.cap="Subset of blanca's first 20 observations. State estimates are color coded over LU/LC and NDWI and 30 m buffers used to extract proportions of land classes and mean NDWI are shown for each position."}
+```{r covar_extr_ex, dev='png', dpi=300, fig.cap="Subset of blanca's first 20 observations. State estimates are color coded over LU/LC and elevation and 30 m buffers used to extract proportions of land classes and mean elevation are shown for each position."}
 
 tmp<- dat[1:20,]
 x.range<- range(tmp$x)
@@ -349,9 +484,8 @@ ggplot() +
 
 
 ggplot() +
-  geom_raster(data = ndwi.df2[ndwi.df2$season == "Winter",], aes(x, y, fill = ndwi)) +
-  scale_fill_distiller("NDWI", palette = "RdBu", na.value = "transparent", limits = c(-1,1),
-                      direction = 1) +
+  geom_raster(data = dem.df, aes(x, y, fill = elev)) +
+  scale_fill_viridis_c("Elevation (m)", na.value = "transparent") +
   geom_sf(data = tmp.buff, fill = "transparent", color = "black") +
   coord_sf() +
   geom_path(data = tmp, aes(x, y, group = id), color = "grey20", size = 0.5) +
@@ -363,9 +497,7 @@ ggplot() +
   theme_bw()
 ```
 
-
-I will be summarizing the behavioral states by ID, season, and hour of day. An overview of the activity budgets for each ID shows that there is very little difference among IDs, where Exploratory and Slow-Uniform states are the most common and occur at approximately the same frequency (except in blanca). The Slow-Turn state is the next most common, followed by the Transit state. While not informative, Unclassified observations typically comprise the greatest proportion of observations. These patterns are also observed when visualizing activity budgets by season. However, it appears that Slow-Uniform and Exploratory states occur at the same frequency during the fall and spring, but the Slow-Uniform state occurs more often during winter and summer. An assessment of activity budgets broken down by hour of the day shows greatest activity from midnight to 4 am. However, there does appear to be some activity occurring after sunrise (i.e., 6:30 to 10 am), which is uncommon since this is a nocturnal species. By explicitly evaluating the proportion of observations attributed to each state per hour, there does not appear to be a discernible pattern. State proportions appear to be relatively constant and exhibited at proportions similar to overall frequencies in the data.
-
+I summarized the behavioral states by ID, season, and hour of day. An overview of the activity budgets for each ID shows that there is very little difference among IDs, where Exploratory and Slow-Uniform states are the most common and occur at approximately the same frequency (except in blanca). The Slow-Turn state is the next most common, followed by the Transit state. These patterns are also observed when visualizing activity budgets by season. However, it appears that Slow-Uniform and Exploratory states occur at the same frequency during the fall and spring, but the Slow-Uniform state occurs more often during winter and summer. While Unclassified observations typically comprised the greatest proportion of observations, they were omitted in some circumstances to facilitate interpretation of the remaining data. An assessment of activity budgets broken down by hour of the day shows greatest activity from midnight to 4 am. However, there does appear to be some activity occurring after sunrise (i.e., 6:30 to 10 am), which is uncommon since this is a nocturnal species. By explicitly evaluating the proportion of observations attributed to each state per hour, there does not appear to be much of a discernible pattern. State proportions appear to be relatively constant and exhibited at proportions similar to overall frequencies in the data apart from the first and last hour periods of activity.
 
 ```{r covar_extr}
 # Proportions LULC w/in 30 m buffer
@@ -382,17 +514,28 @@ extr.lulc2<- map(extr.lulc, ~{prop.table(table(.))}) %>%  #convert to proportion
 names(extr.lulc2)<- c("Forest", "Closed_Savanna", "Open_Savanna", "Floodable")
 
 
-# Mean NDWI w/in 30 m buffer
-extr.ndwi<- rep(NA, nrow(dat))
+# Mean elevation w/in 30 m buffer
+extr.dem<- extract(dem, dat[,c('x','y')], buffer = 30, fun = mean)
+
+
+# Mean NDWI, NDVI, Brightness, Greenness, and Wetness w/in 30 m buffer
 seasons<- names(ndwi)
-for (i in 1:nlayers(ndwi)) {
+dyn.covars<- list(ndwi, ndvi, bright, green, wet)
+names(dyn.covars)<- c("ndwi", "ndvi", "bright", "green", "wet")
+extr.dyn.covars<- matrix(NA, nrow(dat), length(dyn.covars))
+for (i in 1:length(seasons)) {
   ind<- which(dat$season == seasons[i])
-  extr.ndwi[ind]<- extract(ndwi[[i]], dat[ind, c('x','y')], buffer = 30, fun = mean)
+  tmp<- map(dyn.covars, function(x) x[[i]]) %>% 
+    stack()
+  
+  extr.dyn.covars[ind,]<- extract(tmp, dat[ind, c('x','y')], buffer = 30, fun = mean)
 }
+extr.dyn.covars<- data.frame(extr.dyn.covars)
+names(extr.dyn.covars)<- names(dyn.covars)
 
 
 # Merge extracted covariates to dat
-dat2<- cbind(dat, extr.lulc2, ndwi = extr.ndwi)
+dat2<- cbind(dat, extr.lulc2, elev = extr.dem, extr.dyn.covars)
 
 ```
 
@@ -445,6 +588,7 @@ ggplot(df.season, aes(z.post.thresh, freq, fill = z.post.thresh)) +
 ## Proportion of behavior by time of night
 
 df.TON<- dat2 %>% 
+  filter(z.post.thresh != "Unclassified") %>% 
   mutate(hour1 = hour(date)) %>% 
   mutate_at('hour1', factor, levels = c(12:23,0:11)) %>% 
   group_by(hour1, z.post.thresh, .drop = F) %>% 
@@ -478,31 +622,37 @@ ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
         legend.text = element_text(size = 10))
 ```
 
+Additionally, I summarized the proportion of behavioral states associated with each land class. Distributions of continuous variables were analyzed for each state as well. There did not appear to be any major differences in the proportion of behavioral states by land class, but Slow-Uniform appeared to be the most prevalent across all land classes. There generally did not appear to be any clear patterns in the distributions of the remaining environmental covariates across behavioral states. However, the Transit state did appear to be associated with slightly greater values of vegetation productivity (NDVI, Greenness), water presence/moisture (NDWI, Wetness), and a higher elevation.
 
-Additionally, I will be summarizing the proportion of LU/LC and the mean value of NDWI associated with each behavioral state. There does not appear to be any major differences in the proportion of land classes by behavioral state, but Closed Savanna appears to be the most prevalent across all states. Additionally, there appears to be a slight increase in the proportions of Floodable habitat visited as armadillos increase in activity and speed (i.e., from Slow-Turn to Transit behavior). The mean NDWI per sampled point shows a similar trend, where NDWI slightly increases from Slow-Turn to Transit.
-
-```{r state_summ2, fig.width=8, fig.cap='Summaries of LU/LC and NDWI for each behavioral state.'}
+```{r state_summ2, fig.width=8, fig.cap='Summaries of environmental covariates per behavioral state.'}
 
 ## Proportion of LULC by behavioral state
 
+#filter for only "pure" land class (100% w/in 30 m buffer)
 df.lulc<- dat2 %>% 
+  filter(Forest == 1 | Closed_Savanna == 1 | Open_Savanna == 1 | Floodable == 1) %>% 
   dplyr::select(z.post.thresh, Forest, Closed_Savanna, Open_Savanna, Floodable) %>% 
-  pivot_longer(cols = -z.post.thresh, names_to = "lulc", values_to = "value")
+  pivot_longer(cols = -z.post.thresh, names_to = "lulc", values_to = "value") %>% 
+  filter(value == 1) %>% 
+  dplyr::select(-value) %>% 
+  group_by(lulc, z.post.thresh) %>% 
+  tally() %>% 
+  filter(z.post.thresh != "Unclassified") %>% 
+  mutate(prop = n/sum(n))
 
 df.lulc$lulc<- factor(df.lulc$lulc, levels = c("Forest", "Closed_Savanna", "Open_Savanna",
                                                "Floodable"))
 
-ggplot(df.lulc) +
-  geom_violin(aes(x = lulc, y = value, fill = lulc), alpha = 0.5) +
-  scale_fill_manual(values = c("darkgreen","burlywood4","darkolivegreen3","lightskyblue1"),
-                    guide = F) +
-  geom_jitter(aes(lulc, value, color = lulc), alpha = 0.15, width = 0.15, height = 0.01) +
-  scale_color_manual(values = c("darkgreen","burlywood4","darkolivegreen3","lightskyblue1"),
-                     guide = F) +
-  scale_x_discrete(labels = c("Forest", "Closed Savanna", "Open Savanna", "Floodable")) +
+ggplot(df.lulc, aes(lulc, n, fill = z.post.thresh)) +
+  geom_bar(stat = "identity",
+           color = "black") +
+  scale_fill_manual("", values = viridis(n=4, option = 'inferno')) +
   theme_bw() +
-  labs(x = "", y = "Proportion (w/in 30 m buffer)") +
-  facet_wrap(~ z.post.thresh) +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        legend.text = element_text(size = 10)) +
+  scale_x_discrete(labels = c("Forest", "Closed Savanna", "Open Savanna", "Floodable")) +
+  labs(x = "", y = "Number of Observations") +
   coord_flip() +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
@@ -510,12 +660,43 @@ ggplot(df.lulc) +
         legend.text = element_text(size = 10))
 
 
+ggplot(df.lulc, aes(lulc, prop, fill = z.post.thresh)) +
+  geom_bar(stat = "identity",
+           color = "black") +
+  scale_fill_manual("", values = viridis(n=4, option = 'inferno')) +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        legend.text = element_text(size = 10)) +
+  scale_x_discrete(labels = c("Forest", "Closed Savanna", "Open Savanna", "Floodable")) +
+  labs(x = "", y = "Proportion of Observations") +
+  coord_flip() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10))
+
+
+## NDVI by behavioral state
+ggplot(dat2, aes(x = z.post.thresh, y = ndvi, fill = z.post.thresh)) +
+  geom_violin(alpha = 0.5) +
+  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  theme_bw() +
+  labs(x = "", y = "Mean NDVI (w/in 30 m buffer)") +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10))
+
 
 ## NDWI by behavioral state
-
 ggplot(dat2, aes(x = z.post.thresh, y = ndwi, fill = z.post.thresh)) +
   geom_violin(alpha = 0.5) +
-  geom_jitter(aes(color = z.post.thresh), width = 0.15, height = 0, alpha = 0.15) +
+  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
   scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
                     guide = F) +
   scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
@@ -526,8 +707,71 @@ ggplot(dat2, aes(x = z.post.thresh, y = ndwi, fill = z.post.thresh)) +
         axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"),
         legend.text = element_text(size = 10))
-```
 
+
+## Elevation by behavioral state
+ggplot(dat2, aes(x = z.post.thresh, y = elev, fill = z.post.thresh)) +
+  geom_violin(alpha = 0.5) +
+  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  theme_bw() +
+  labs(x = "", y = "Mean Elevation (w/in 30 m buffer)") +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10))
+
+
+## Brightness by behavioral state
+ggplot(dat2, aes(x = z.post.thresh, y = bright, fill = z.post.thresh)) +
+  geom_violin(alpha = 0.5) +
+  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  theme_bw() +
+  labs(x = "", y = "Mean Brightness (w/in 30 m buffer)") +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10))
+
+
+## Greenness by behavioral state
+ggplot(dat2, aes(x = z.post.thresh, y = green, fill = z.post.thresh)) +
+  geom_violin(alpha = 0.5) +
+  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  theme_bw() +
+  labs(x = "", y = "Mean Greenness (w/in 30 m buffer)") +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10))
+
+
+## Wetness by behavioral state
+ggplot(dat2, aes(x = z.post.thresh, y = wet, fill = z.post.thresh)) +
+  geom_violin(alpha = 0.5) +
+  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
+                    guide = F) +
+  theme_bw() +
+  labs(x = "", y = "Mean Wetness (w/in 30 m buffer)") +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10))
+```
 
 We can also take a look at the 50 and 95% kernel density isopleths for each state to get a sense of what types of land cover might be used the most during different behaviors within a spatial context. Based on a simple visual inspection of this plot, it appears that a greater amount of Floodable habitat falls within the 95% isopleth for the Transit state while the remaining states primarily overlap with Closed and Open Savanna. This corresponds with the previous figures that were shown.
 
@@ -555,7 +799,6 @@ return(dat_out)
 }
 
 ```
-
 
 ```{r kde_map, fig.width=9, fig.height=6, fig.cap='The 50 and 95 percent isopleths are shown from a kernel density estimate of locations for each state across all IDs.'}
 
@@ -604,25 +847,24 @@ ggplot() +
 
 ```
 
-
 \newpage
 
 ## Comparisons of state-habitat relationships
 
-Multiple pairwise logistic regressions were performed to make pairwise comparisons of environmental covariates on the probability of being in one state or another. This resulted in a total of six comparisons. Since the Closed Savanna land class served as the reference for each model, estimates are only shown for the other three land classes and NDWI.
+Multiple pairwise logistic regressions were performed to make pairwise comparisons of environmental covariates on the probability of being in one state or another. This resulted in a total of six comparisons. As mentioned previously, only elevation, greenness, and wetness were included as covariates in addition to animal ID.
 
 ```{r}
 
 #remove observations w/ "Unclassified" state (based on z.post.max)
 dat3<- dat2 %>% 
-  filter(z.post.thresh != "Unclassified")
+  filter(z.post.thresh != "Unclassified") %>% 
+  mutate(across(.cols = c(Forest:wet), scale))
 
 ```
 
-
 ### Slow-Turn vs Slow-Uniform
 
-In this comparison, increases in the proportions of Forest, Open Savanna, or Floodable habitat were more likely to be associated with exhibiting a Slow-Turn state. While the effect of NDWI did not appear to be significant, greater values (i.e., wetter habitat) were associated with a greater probability of exhibiting a Slow-Uniform state.
+In this comparison, Slow-Uniform behavior was more likely to occur in habitats with greater vegetation productivity (greenness), but the Slow-Turn state was more likely to occur at greater elevations. Wetness did not appear to significantly impact the probability of exhibiting either state.
 
 ```{r logres_slowturn_slowunif, fig.cap='Odds ratios for each of the environmental covariates where values greater than 1 favor a Slow-Uniform state.'}
 ## Compare Slow-Turn vs Slow-Unif (Closed Savanna and blanca are reference classes)
@@ -630,14 +872,14 @@ dat.st.su<- dat3 %>%
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Slow-Unif")
 dat.st.su$state<- ifelse(dat.st.su$z.post.thresh == "Slow-Turn", 0, 1)
 # table(dat.st.su$id, dat.st.su$state)  #check n per combo
-st.su.mod<- glm(state ~ Forest + Open_Savanna + Floodable + ndwi + id,
+st.su.mod<- glm(state ~ elev + green + wet + id,
                 data = dat.st.su, family = binomial)
 # summary(st.su.mod)
 
 # Slow-Unif as ref
 ## odds ratios and 95% CI
 coeffs.st.su<- data.frame(exp(cbind(fit = coef(st.su.mod), confint(st.su.mod))))
-coeffs.st.su<- coeffs.st.su[2:5,]
+coeffs.st.su<- coeffs.st.su[2:4,]
 names(coeffs.st.su)[2:3]<- c("Lower","Upper")
 coeffs.st.su$coef.names<- rownames(coeffs.st.su)
 coeffs.st.su$coef.names<- factor(coeffs.st.su$coef.names,
@@ -647,13 +889,13 @@ ggplot(data=coeffs.st.su, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  scale_y_continuous(limits = c(-6,8)) +
-  annotate(geom = "text", x = "Floodable", y = 4, label = "bold(Slow-Uniform)",
+  ylim(c(-1,3)) +
+  annotate(geom = "text", x = "green", y = 2.3, label = "bold(Slow-Uniform)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "Floodable", y = -3, label = "bold(Slow-Turn)",
+  annotate(geom = "text", x = "green", y = 0, label = "bold(Slow-Turn)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Forest","Open Savanna","Floodable","NDWI")) +
+  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -665,7 +907,7 @@ ggplot(data=coeffs.st.su, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
 
 ### Slow-Turn vs Exploratory
 
-Similar to the previous comparison, increases in the proportions of Forest, Open Savanna, and Floodable habitat were more likely to be associated with exhibiting a Slow-Turn state. However, NDWI shows a positive relationship with the probability of exhibiting an Exploratory state.
+Similar to the previous comparison, increasing values in greenness were associated with a greater probability of exhibiting an Exploratory state, while higher elevations were more indicative of a Slow-Turn state. Again, wetness did not drive the probability of exhibiting either state.
 
 ```{r logres_slowturn_exploratory, fig.cap='Odds ratios for each of the environmental covariates where values greater than 1 favor an Exploratory state.'}
 ## Compare Slow-Turn vs Exploratory
@@ -673,14 +915,14 @@ dat.st.exp<- dat3 %>%
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Exploratory")
 dat.st.exp$state<- ifelse(dat.st.exp$z.post.thresh == "Slow-Turn", 0, 1)
 # table(dat.st.exp$id, dat.st.exp$state)  #check n per combo
-st.exp.mod<- glm(state ~ Forest + Open_Savanna + Floodable + ndwi + id,
+st.exp.mod<- glm(state ~ elev + green + wet + id,
                 data = dat.st.exp, family = binomial)
 # summary(st.exp.mod)
 
 # Exploratory as ref
 ## odds ratios and 95% CI
 coeffs.st.exp<- data.frame(exp(cbind(fit = coef(st.exp.mod), confint(st.exp.mod))))
-coeffs.st.exp<- coeffs.st.exp[2:5,]
+coeffs.st.exp<- coeffs.st.exp[2:4,]
 names(coeffs.st.exp)[2:3]<- c("Lower","Upper")
 coeffs.st.exp$coef.names<- rownames(coeffs.st.exp)
 coeffs.st.exp$coef.names<- factor(coeffs.st.exp$coef.names,
@@ -690,13 +932,13 @@ ggplot(data=coeffs.st.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  scale_y_continuous(limits = c(-6,15)) +
-  annotate(geom = "text", x = "Floodable", y = 8, label = "bold(Exploratory)",
+  ylim(c(-1,3)) +
+  annotate(geom = "text", x = "green", y = 2.3, label = "bold(Exploratory)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "Floodable", y = -4, label = "bold(Slow-Turn)",
+  annotate(geom = "text", x = "green", y = 0, label = "bold(Slow-Turn)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Forest","Open Savanna","Floodable","NDWI")) +
+  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -708,75 +950,50 @@ ggplot(data=coeffs.st.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
 
 ### Slow-Turn vs Transit
 
-In this comparison, there was a much greater range of covariate effects with respect to the previous two comparisons. Increases in the proportion of Forest were more likely to be associated with a Slow-Turn state while Open Savanna and Floodable land classes did not show a significant effect. In this model, the effect of NDWI was much larger than when Slow-Turn was compared to Slow-Uniform and Exploratory states, indicating that NDWI is more influential in this comparison and that higher values (i.e., wetter habitat) is much more likely to be associated with a Transit state.  
+Nearly identical to the previous two comparisons, Transit was more likely to occur with greater levels of vegetation productivity whereas Slow-Turn was more likely at greater elevations. Wetness also did not appear to have a significant effect on the probability of either state.
 
-```{r logres_slowturn_transit, fig.width=10, fig.height=8, fig.cap='Odds ratios for each of the environmental covariates where values greater than 1 favor a Transit state.'}
+```{r logres_slowturn_transit, fig.cap='Odds ratios for each of the environmental covariates where values greater than 1 favor a Transit state.'}
 ## Compare Slow-Turn vs Transit
 dat.st.t<- dat3 %>% 
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Transit")
 dat.st.t$state<- ifelse(dat.st.t$z.post.thresh == "Slow-Turn", 0, 1)
 # table(dat.st.t$id, dat.st.t$state)  #check n per combo
-st.t.mod<- glm(state ~ Forest + Open_Savanna + Floodable + ndwi + id,
+st.t.mod<- glm(state ~ elev + green + wet + id,
                  data = dat.st.t, family = binomial)
 # summary(st.t.mod)
 
 # Transit as ref
 ## odds ratios and 95% CI
 coeffs.st.t<- data.frame(exp(cbind(fit = coef(st.t.mod), confint(st.t.mod))))
-coeffs.st.t<- coeffs.st.t[2:5,]
+coeffs.st.t<- coeffs.st.t[2:4,]
 names(coeffs.st.t)[2:3]<- c("Lower","Upper")
 coeffs.st.t$coef.names<- rownames(coeffs.st.t)
 coeffs.st.t$coef.names<- factor(coeffs.st.t$coef.names,
                                   levels = unique(coeffs.st.t$coef.names))
 
-p.st.t<- ggplot(data=coeffs.st.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+ggplot(data=coeffs.st.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  scale_y_continuous(limits = c(-100,255)) +
-  annotate(geom = "text", x = "Floodable", y = 100, label = "bold(Transit)",
+  ylim(c(-1,3)) +
+  annotate(geom = "text", x = "green", y = 2.5, label = "bold(Transit)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "Floodable", y = -60, label = "bold(Slow-Turn)",
+  annotate(geom = "text", x = "green", y = 0, label = "bold(Slow-Turn)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Forest","Open Savanna","Floodable","NDWI")) +
+  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 18),
         panel.grid = element_blank())
-
-#zoomed in
-p.st.t.inset<- ggplot(data=coeffs.st.t %>% filter(coef.names != "ndwi"),
-       aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
-  geom_hline(yintercept = 1) +
-  geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
-  geom_point(position = position_dodge(0.55), size=2) +
-  # scale_y_continuous(limits = c(-3,5)) +
-  # annotate(geom = "text", x = "Open_Savanna", y = 3, label = "bold(Transit)",
-  #          parse = T, size = 5) +
-  # annotate(geom = "text", x = "Open_Savanna", y = -1, label = "bold(Slow-Turn)",
-  #          parse = T, size = 5) +
-  theme_bw() +
-  scale_x_discrete(labels = c("Forest","Open Savanna","Floodable")) +
-  coord_flip() +
-  labs(x="", y="") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 18),
-        panel.grid = element_blank())
-
-## create plot w/ zoomed-in inset
-ggdraw() +
-  draw_plot(p.st.t)  +
-  draw_plot(p.st.t.inset, x = 0.48, y = 0.12, width = 0.5, height = 0.4)
 ```
-
 
 \newpage
 
 ### Slow-Uniform vs Exploratory
 
-In this comparison, Forest and Open Savanna did not have a significant effects, whereas Floodable habitat did show a positive relationship with the probability of exhibiting an Exploratory state. While the 95% confidence interval of NDWI overlaps 1, it appears that greater values of NDWI are more likely to occur when in an Exploratory state. This is consistent with the effect of the Floodable covariate.  
+In this comparison, none of the 3 covariates significantly impacted the probability of exhibiting either state. This relationship differs largely from that observed when comparing against the Slow-Turn state.
 
 ```{r logres_slowunif_exploratory, fig.cap='Odds ratios for each of the environmental covariates where values greater than 1 favor an Exploratory state.'}
 ## Compare Slow-Unif vs Exploratory
@@ -784,14 +1001,14 @@ dat.su.exp<- dat3 %>%
   filter(z.post.thresh == "Slow-Unif" | z.post.thresh == "Exploratory")
 dat.su.exp$state<- ifelse(dat.su.exp$z.post.thresh == "Slow-Unif", 0, 1)
 # table(dat.su.exp$id, dat.su.exp$state)  #check n per combo
-su.exp.mod<- glm(state ~ Forest + Open_Savanna + Floodable + ndwi + id,
+su.exp.mod<- glm(state ~ elev + green + wet + id,
                  data = dat.su.exp, family = binomial)
 # summary(su.exp.mod)
 
 # Exploratory as ref
 ## odds ratios and 95% CI
 coeffs.su.exp<- data.frame(exp(cbind(fit = coef(su.exp.mod), confint(su.exp.mod))))
-coeffs.su.exp<- coeffs.su.exp[2:5,]
+coeffs.su.exp<- coeffs.su.exp[2:4,]
 names(coeffs.su.exp)[2:3]<- c("Lower","Upper")
 coeffs.su.exp$coef.names<- rownames(coeffs.su.exp)
 coeffs.su.exp$coef.names<- factor(coeffs.su.exp$coef.names,
@@ -801,13 +1018,13 @@ ggplot(data=coeffs.su.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  scale_y_continuous(limits = c(-2,6)) +
-  annotate(geom = "text", x = "Floodable", y = 3.5, label = "bold(Exploratory)",
+  ylim(c(0,2)) +
+  annotate(geom = "text", x = "green", y = 1.5, label = "bold(Exploratory)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "Floodable", y = -1, label = "bold(Slow-Unif)",
+  annotate(geom = "text", x = "green", y = 0.5, label = "bold(Slow-Uniform)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Forest","Open Savanna","Floodable","NDWI")) +
+  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -815,82 +1032,54 @@ ggplot(data=coeffs.su.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
         panel.grid = element_blank())
 ```
 
-
 \newpage
 
 ### Slow-Uniform vs Transit
 
-Nearly identical to the previous comparison between the Slow-Uniform and Exploratory states, Forest and Open Savanna did not significantly effect the probability of exhibiting a Slow-Uniform or Transit state, but the Floodable land class and NDWI both displayed positive relationships with the likelihood of exhibiting a Transit state. Unlike the previous comparison, the confidence interval for NDWI doesn't cross 1.
+Although the 95% confidence intervals for greenness and elevation slightly crossed zero, the coefficient estimates appeared similar to previous comparisons. That is to say, the faster state (Transit) was more likely with increasing vegetation productivity, but the slower state (Slow-Uniform) was more likely at greater elevations.
 
-```{r logres_slowunif_transit, fig.width=10, fig.height=8, fig.cap='Odds ratios for each of the environmental covariates where values greater than 1 favor a Transit state.'}
+```{r logres_slowunif_transit, fig.cap='Odds ratios for each of the environmental covariates where values greater than 1 favor a Transit state.'}
 ## Compare Slow-Unif vs Transit
 dat.su.t<- dat3 %>% 
   filter(z.post.thresh == "Slow-Unif" | z.post.thresh == "Transit")
 dat.su.t$state<- ifelse(dat.su.t$z.post.thresh == "Slow-Unif", 0, 1)
 # table(dat.su.t$id, dat.su.t$state)  #check n per combo
-su.t.mod<- glm(state ~ Forest + Open_Savanna + Floodable + ndwi + id,
+su.t.mod<- glm(state ~ elev + green + wet + id,
                  data = dat.su.t, family = binomial)
 # summary(su.t.mod)
 
 # Transit as ref
 ## odds ratios and 95% CI
 coeffs.su.t<- data.frame(exp(cbind(fit = coef(su.t.mod), confint(su.t.mod))))
-coeffs.su.t<- coeffs.su.t[2:5,]
+coeffs.su.t<- coeffs.su.t[2:4,]
 names(coeffs.su.t)[2:3]<- c("Lower","Upper")
 coeffs.su.t$coef.names<- rownames(coeffs.su.t)
 coeffs.su.t$coef.names<- factor(coeffs.su.t$coef.names,
                                   levels = unique(coeffs.su.t$coef.names))
 
-p.su.t<- ggplot(data=coeffs.su.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+ggplot(data=coeffs.su.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  scale_y_continuous(limits = c(-40,85), breaks = seq(-25,75, by=25)) +
-  annotate(geom = "text", x = "Floodable", y = 40, label = "bold(Transit)",
+  ylim(c(-1,3)) +
+  annotate(geom = "text", x = "green", y = 2.3, label = "bold(Transit)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "Floodable", y = -20, label = "bold(Slow-Unif)",
+  annotate(geom = "text", x = "green", y = 0, label = "bold(Slow-Uniform)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Forest","Open Savanna","Floodable","NDWI")) +
+  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
         axis.title = element_text(size = 18),
         panel.grid = element_blank())
-
-
-
-#zoomed in
-p.su.t.inset<- ggplot(data=coeffs.su.t %>% filter(coef.names != "ndwi"),
-       aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
-  geom_hline(yintercept = 1) +
-  geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
-  geom_point(position = position_dodge(0.55), size=2) +
-  # scale_y_continuous(limits = c(-2,5)) +
-  # annotate(geom = "text", x = "Open_Savanna", y = 3.5, label = "bold(Transit)",
-  #          parse = T, size = 5) +
-  # annotate(geom = "text", x = "Open_Savanna", y = -1, label = "bold(Slow-Unif)",
-  #          parse = T, size = 5) +
-  theme_bw() +
-  scale_x_discrete(labels = c("Forest","Open Savanna","Floodable")) +
-  coord_flip() +
-  labs(x="", y="") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 18),
-        panel.grid = element_blank())
-
-## create plot w/ zoomed-in inset
-ggdraw() +
-  draw_plot(p.su.t)  +
-  draw_plot(p.su.t.inset, x = 0.48, y = 0.12, width = 0.5, height = 0.4)
 ```
-
 
 \newpage
 
 ### Exploratory vs Transit
 
-Similar to the previous two comparisons, Forest and Open Savanna did not significantly effect the probability of exhibiting an Exploratory or Transit state, but the Floodable land class and NDWI both displayed positive relationships with the likelihood of exhibiting a Transit state. However, it should be noted that the 95% confidence interval for NDWI does cross 1 in this comparison. 
+Similar to the previous comparisons, all 95% confidence intervals for the coefficients crossed a value of one, but greenness and elevation appeared to reflect previous trends of faster movements in highly productive habitat and slow movements at higher elevations. Wetness did not significantly impact the probability of exhibiting either state.
 
 ```{r logres_exploratory_transit, fig.cap='Odds ratios for each of the environmental covariates where values greater than 1 favor a Transit state.'}
 ## Compare Exploratory vs Transit
@@ -898,14 +1087,14 @@ dat.exp.t<- dat3 %>%
   filter(z.post.thresh == "Exploratory" | z.post.thresh == "Transit")
 dat.exp.t$state<- ifelse(dat.exp.t$z.post.thresh == "Exploratory", 0, 1)
 # table(dat.exp.t$id, dat.exp.t$state)  #check n per combo
-exp.t.mod<- glm(state ~ Forest + Open_Savanna + Floodable + ndwi + id,
+exp.t.mod<- glm(state ~ elev + green + wet + id,
                  data = dat.exp.t, family = binomial)
 # summary(exp.t.mod)
 
 # Transit as ref
 ## odds ratios and 95% CI
 coeffs.exp.t<- data.frame(exp(cbind(fit = coef(exp.t.mod), confint(exp.t.mod))))
-coeffs.exp.t<- coeffs.exp.t[2:5,]
+coeffs.exp.t<- coeffs.exp.t[2:4,]
 names(coeffs.exp.t)[2:3]<- c("Lower","Upper")
 coeffs.exp.t$coef.names<- rownames(coeffs.exp.t)
 coeffs.exp.t$coef.names<- factor(coeffs.exp.t$coef.names,
@@ -915,13 +1104,13 @@ ggplot(data=coeffs.exp.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  scale_y_continuous(limits = c(-10,22)) +
-  annotate(geom = "text", x = "Floodable", y = 12, label = "bold(Transit)",
+  ylim(c(-1,3)) +
+  annotate(geom = "text", x = "green", y = 2.3, label = "bold(Transit)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "Floodable", y = -5, label = "bold(Exploratory)",
+  annotate(geom = "text", x = "green", y = 0, label = "bold(Exploratory)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Forest","Open Savanna","Floodable","NDWI")) +
+  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -930,19 +1119,14 @@ ggplot(data=coeffs.exp.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
 
 ```
 
-
 \newpage
-
 
 # Discussion
 
-Based on our analysis that used a non-parametric Bayesian mixture model to estimate the number of optimal states and their distributions for each data stream (i.e., activity counts, speed, turning angles), four *active* states appeared optimal for these data. Two states had relatively low activity counts and low speed, but differed in their distributions of turning angles. The state with turning angles near $-\pi/\pi$ radians was labeled "Slow-Turn" while the other had a uniform distribution of turning angles and was labeled "Slow-Uniform". These state names primarily serve as a place-holder for more descriptive labels. The third state had a higher level of activity counts and higher speeds with turning angles slightly concentrated around 0 radians, although only slightly. This state was labeled "Exploratory" and may represent an intermediate activity state while armadillos are searching for food, shelter, or conspecifics. The fourth state displayed the greatest activity counts, highest speeds, and turning angles highly concentrated near 0 radians. These states were then assigned to the 62% of observations where certainty of belonging to a single state was high ($\geq$ 75%). When there was greater uncertainty as to which state an observation belonged, it was labeled as "Unclassified". These state estimates were used in the subsequent analyses that compared the effects of LU/LC and NDWI on exhibiting one state over another.\newline
-
+Based on our analysis that used a non-parametric Bayesian mixture model to estimate the number of optimal states and their distributions for each data stream (i.e., activity counts, speed, turning angles), four *active* states appeared optimal for these data. Two states had relatively low activity counts and low speed, but differed in their distributions of turning angles. The state with turning angles near $-\pi/\pi$ radians was labeled "Slow-Turn" while the other had a uniform distribution of turning angles and was labeled "Slow-Uniform". These state names primarily serve as a place-holder for more descriptive labels. The third state had a higher level of activity counts and higher speeds with turning angles slightly concentrated around 0 radians, although only slightly. This state was labeled "Exploratory" and may represent an intermediate activity state while armadillos are searching for food, shelter, or conspecifics. The fourth state displayed the greatest activity counts, highest speeds, and turning angles highly concentrated near 0 radians. These states were then assigned to the 62% of observations where certainty of belonging to a single state was high ($\geq$ 75%). When there was greater uncertainty as to which state an observation belonged, it was labeled as "Unclassified". These state estimates were used in the subsequent analyses that compared the effects of elevation, greenness, and wetness on exhibiting one state over another.\newline
 
 When evaluating general trends in the proportions of behavioral states, there was little variation in the frequency of the states that were exhibited across individuals, seasons, and by hour of the day. In general, the "Exploratory" and "Slow-Uniform" states were most common, followed by "Slow-Turn" and then "Transit". This seems to make sense given that the "Exploratory" state may be related to searching for sites to forage, whereas "Transit" would typically occur when moving quickly over long distances between patches of habitat. It is currently unclear what behaviors are represented by the slower behavioral states. Additionally, relationships with environmental covariates did not appear to be easily discernible.\newline
 
-
-When assessing the effects of environmental covariates on the probability of exhibiting one state over another, there was typically a consistent pattern when moving from slow to fast states. In each of the logistic regressions, the slower state was often favored when there were greater proportions of Forest and Open Savanna, whereas the faster state was favored with higher values of NDWI. The Floodable land class showed mixed responses, but is more closely associated with the effect of NDWI since it reflects a very similar landscape metric.\newline
-
+When assessing the effects of environmental covariates on the probability of exhibiting one state over another, there was typically a consistent pattern when moving from slow to fast states. In each of the logistic regressions, the slower state was often favored when there were greater elevations, whereas the faster state was favored with higher values of greenness. The wetness covariate did not appear to significantly impact the probability of exhibiting any state over another.\newline
 
 While there do appear to be potential ecological patterns that emerge from comparisons among states, it is currently difficult to discriminate among states for the given set of data and analyses. It is possible that not enough behavioral variation was captured by these specific tracks since there were not distinct values of environmental covariates that characterized each of the different states. However, further analyses with a larger sample size may be able to discriminate these behaviors further. Additionally, these states may be used for additional analyses, such as to assess habitat selection for specific behavioral states.
