@@ -279,7 +279,7 @@ dat2<- cbind(dat, extr.lulc2, elev = extr.dem, extr.dyn.covars)
 # Check correlations among covariates (remove vars if |corr| > 0.7)
 PerformanceAnalytics::chart.Correlation(dat2[,16:25])
 ## based on high corrs, removing NDWI, NDVI, and Brightness
-
+## due to low level of added information, also removing LULC and elevation
 
 ######################################################
 ### Exploratory Data Analysis of Behavioral States ###
@@ -493,14 +493,14 @@ dat.st.su<- dat3 %>%
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Slow-Unif")
 dat.st.su$state<- ifelse(dat.st.su$z.post.thresh == "Slow-Turn", 0, 1)
 table(dat.st.su$id, dat.st.su$state)  #check n per combo
-st.su.mod<- glm(state ~ elev + green + wet + id,
+st.su.mod<- glm(state ~ green + wet + id,
                 data = dat.st.su, family = binomial)
 summary(st.su.mod)
 
 # Slow-Unif as ref
 ## odds ratios and 95% CI
 coeffs.st.su<- data.frame(exp(cbind(fit = coef(st.su.mod), confint(st.su.mod))))
-coeffs.st.su<- coeffs.st.su[2:4,]
+coeffs.st.su<- coeffs.st.su[2:3,]
 names(coeffs.st.su)[2:3]<- c("Lower","Upper")
 coeffs.st.su$coef.names<- rownames(coeffs.st.su)
 coeffs.st.su$coef.names<- factor(coeffs.st.su$coef.names,
@@ -510,13 +510,13 @@ ggplot(data=coeffs.st.su, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(-1,3)) +
-  annotate(geom = "text", x = "green", y = 2.3, label = "bold(Slow-Uniform)",
+  ylim(c(0,2)) +
+  annotate(geom = "text", x = "wet", y = 1.5, label = "bold(Slow-Uniform)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "green", y = 0, label = "bold(Slow-Turn)",
+  annotate(geom = "text", x = "wet", y = 0.5, label = "bold(Slow-Turn)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
+  scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -531,14 +531,14 @@ dat.st.exp<- dat3 %>%
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Exploratory")
 dat.st.exp$state<- ifelse(dat.st.exp$z.post.thresh == "Slow-Turn", 0, 1)
 table(dat.st.exp$id, dat.st.exp$state)  #check n per combo
-st.exp.mod<- glm(state ~ elev + green + wet + id,
+st.exp.mod<- glm(state ~ green + wet + id,
                 data = dat.st.exp, family = binomial)
 summary(st.exp.mod)
 
 # Exploratory as ref
 ## odds ratios and 95% CI
 coeffs.st.exp<- data.frame(exp(cbind(fit = coef(st.exp.mod), confint(st.exp.mod))))
-coeffs.st.exp<- coeffs.st.exp[2:4,]
+coeffs.st.exp<- coeffs.st.exp[2:3,]
 names(coeffs.st.exp)[2:3]<- c("Lower","Upper")
 coeffs.st.exp$coef.names<- rownames(coeffs.st.exp)
 coeffs.st.exp$coef.names<- factor(coeffs.st.exp$coef.names,
@@ -548,13 +548,13 @@ ggplot(data=coeffs.st.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(-1,3)) +
-  annotate(geom = "text", x = "green", y = 2.3, label = "bold(Exploratory)",
+  ylim(c(0.5,1.75)) +
+  annotate(geom = "text", x = "wet", y = 1.3, label = "bold(Exploratory)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "green", y = 0, label = "bold(Slow-Turn)",
+  annotate(geom = "text", x = "wet", y = 0.65, label = "bold(Slow-Turn)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
+  scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -568,14 +568,14 @@ dat.st.t<- dat3 %>%
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Transit")
 dat.st.t$state<- ifelse(dat.st.t$z.post.thresh == "Slow-Turn", 0, 1)
 table(dat.st.t$id, dat.st.t$state)  #check n per combo
-st.t.mod<- glm(state ~ elev + green + wet + id,
+st.t.mod<- glm(state ~ green + wet + id,
                  data = dat.st.t, family = binomial)
 summary(st.t.mod)
 
 # Transit as ref
 ## odds ratios and 95% CI
 coeffs.st.t<- data.frame(exp(cbind(fit = coef(st.t.mod), confint(st.t.mod))))
-coeffs.st.t<- coeffs.st.t[2:4,]
+coeffs.st.t<- coeffs.st.t[2:3,]
 names(coeffs.st.t)[2:3]<- c("Lower","Upper")
 coeffs.st.t$coef.names<- rownames(coeffs.st.t)
 coeffs.st.t$coef.names<- factor(coeffs.st.t$coef.names,
@@ -585,13 +585,13 @@ ggplot(data=coeffs.st.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(-1,3)) +
-  annotate(geom = "text", x = "green", y = 2.5, label = "bold(Transit)",
+  ylim(c(0,2)) +
+  annotate(geom = "text", x = "wet", y = 1.6, label = "bold(Transit)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "green", y = 0, label = "bold(Slow-Turn)",
+  annotate(geom = "text", x = "wet", y = 0.4, label = "bold(Slow-Turn)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
+  scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -603,16 +603,16 @@ ggplot(data=coeffs.st.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
 ## Compare Slow-Unif vs Exploratory
 dat.su.exp<- dat3 %>% 
   filter(z.post.thresh == "Slow-Unif" | z.post.thresh == "Exploratory")
-dat.su.exp$state<- ifelse(dat.su.exp$z.post.thresh == "Slow-Uniform", 0, 1)
+dat.su.exp$state<- ifelse(dat.su.exp$z.post.thresh == "Slow-Unif", 0, 1)
 table(dat.su.exp$id, dat.su.exp$state)  #check n per combo
-su.exp.mod<- glm(state ~ elev + green + wet + id,
+su.exp.mod<- glm(state ~ green + wet + id,
                  data = dat.su.exp, family = binomial)
 summary(su.exp.mod)
 
 # Exploratory as ref
 ## odds ratios and 95% CI
 coeffs.su.exp<- data.frame(exp(cbind(fit = coef(su.exp.mod), confint(su.exp.mod))))
-coeffs.su.exp<- coeffs.su.exp[2:4,]
+coeffs.su.exp<- coeffs.su.exp[2:3,]
 names(coeffs.su.exp)[2:3]<- c("Lower","Upper")
 coeffs.su.exp$coef.names<- rownames(coeffs.su.exp)
 coeffs.su.exp$coef.names<- factor(coeffs.su.exp$coef.names,
@@ -622,13 +622,13 @@ ggplot(data=coeffs.su.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0,2)) +
-  annotate(geom = "text", x = "green", y = 1.5, label = "bold(Exploratory)",
+  ylim(c(0.5,1.5)) +
+  annotate(geom = "text", x = "wet", y = 1.3, label = "bold(Exploratory)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "green", y = 0.5, label = "bold(Slow-Uniform)",
+  annotate(geom = "text", x = "wet", y = 0.7, label = "bold(Slow-Uniform)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
+  scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -643,14 +643,14 @@ dat.su.t<- dat3 %>%
   filter(z.post.thresh == "Slow-Unif" | z.post.thresh == "Transit")
 dat.su.t$state<- ifelse(dat.su.t$z.post.thresh == "Slow-Unif", 0, 1)
 table(dat.su.t$id, dat.su.t$state)  #check n per combo
-su.t.mod<- glm(state ~ elev + green + wet + id,
+su.t.mod<- glm(state ~ green + wet + id,
                  data = dat.su.t, family = binomial)
 summary(su.t.mod)
 
 # Transit as ref
 ## odds ratios and 95% CI
 coeffs.su.t<- data.frame(exp(cbind(fit = coef(su.t.mod), confint(su.t.mod))))
-coeffs.su.t<- coeffs.su.t[2:4,]
+coeffs.su.t<- coeffs.su.t[2:3,]
 names(coeffs.su.t)[2:3]<- c("Lower","Upper")
 coeffs.su.t$coef.names<- rownames(coeffs.su.t)
 coeffs.su.t$coef.names<- factor(coeffs.su.t$coef.names,
@@ -660,13 +660,13 @@ ggplot(data=coeffs.su.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(-1,3)) +
-  annotate(geom = "text", x = "green", y = 2.3, label = "bold(Transit)",
+  ylim(c(0.25,1.75)) +
+  annotate(geom = "text", x = "wet", y = 1.4, label = "bold(Transit)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "green", y = 0, label = "bold(Slow-Uniform)",
+  annotate(geom = "text", x = "wet", y = 0.5, label = "bold(Slow-Uniform)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
+  scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
@@ -681,14 +681,14 @@ dat.exp.t<- dat3 %>%
   filter(z.post.thresh == "Exploratory" | z.post.thresh == "Transit")
 dat.exp.t$state<- ifelse(dat.exp.t$z.post.thresh == "Exploratory", 0, 1)
 table(dat.exp.t$id, dat.exp.t$state)  #check n per combo
-exp.t.mod<- glm(state ~ elev + green + wet + id,
+exp.t.mod<- glm(state ~ green + wet + id,
                  data = dat.exp.t, family = binomial)
 summary(exp.t.mod)
 
 # Transit as ref
 ## odds ratios and 95% CI
 coeffs.exp.t<- data.frame(exp(cbind(fit = coef(exp.t.mod), confint(exp.t.mod))))
-coeffs.exp.t<- coeffs.exp.t[2:4,]
+coeffs.exp.t<- coeffs.exp.t[2:3,]
 names(coeffs.exp.t)[2:3]<- c("Lower","Upper")
 coeffs.exp.t$coef.names<- rownames(coeffs.exp.t)
 coeffs.exp.t$coef.names<- factor(coeffs.exp.t$coef.names,
@@ -698,13 +698,13 @@ ggplot(data=coeffs.exp.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(-1,3)) +
-  annotate(geom = "text", x = "green", y = 2.3, label = "bold(Transit)",
+  ylim(c(0.25,1.75)) +
+  annotate(geom = "text", x = "wet", y = 1.4, label = "bold(Transit)",
            parse = T, size = 5) +
-  annotate(geom = "text", x = "green", y = 0, label = "bold(Exploratory)",
+  annotate(geom = "text", x = "wet", y = 0.5, label = "bold(Exploratory)",
            parse = T, size = 5) +
   theme_bw() +
-  scale_x_discrete(labels = c("Elevation","Greenness","Wetness")) +
+  scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
   labs(x="", y="Odds Ratio") +
   theme(axis.text = element_text(size = 14),
