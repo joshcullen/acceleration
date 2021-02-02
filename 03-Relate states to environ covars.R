@@ -335,6 +335,7 @@ df.TON<- dat2 %>%
   filter(z.post.thresh != "Unclassified") %>% 
   mutate(hour1 = hour(date)) %>% 
   mutate_at('hour1', factor, levels = c(12:23,0:11)) %>% 
+  mutate_at('z.post.thresh', droplevels) %>% 
   group_by(hour1, z.post.thresh, .drop = F) %>% 
   tally() %>% 
   mutate(freq = n / sum(n))
@@ -363,7 +364,9 @@ ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
   labs(x = "Hour", y = "Proportion of Observations") +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
-        legend.text = element_text(size = 10))
+        legend.text = element_text(size = 10),
+        strip.text = element_text(size = 12, face = "bold")) +
+  facet_wrap(~ z.post.thresh)
 
 
 
@@ -415,19 +418,15 @@ ggplot(df.lulc, aes(lulc, prop, fill = z.post.thresh)) +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"),
-        legend.text = element_text(size = 10))
+        legend.text = element_text(size = 10)) +
+  facet_wrap(~ z.post.thresh)
 
 
 ## Elevation by behavioral state
-ggplot(dat2, aes(x = z.post.thresh, y = elev, fill = z.post.thresh)) +
-  geom_violin(alpha = 0.5) +
-  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
-  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
-                    guide = F) +
-  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
-                     guide = F) +
-  theme_bw() +
-  labs(x = "", y = "Mean Elevation (w/in 30 m buffer)") +
+ggplot(dat2, aes(x = elev, color = z.post.thresh)) +
+  geom_density(alpha = 0.25, size = 1) +
+  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey")) +
+  labs(x = "Mean Elevation (w/in 30 m buffer)", y = "Density") +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"),
@@ -435,15 +434,10 @@ ggplot(dat2, aes(x = z.post.thresh, y = elev, fill = z.post.thresh)) +
 
 
 ## Greenness by behavioral state
-ggplot(dat2, aes(x = z.post.thresh, y = green, fill = z.post.thresh)) +
-  geom_violin(alpha = 0.5) +
-  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
-  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
-                    guide = F) +
-  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
-                     guide = F) +
-  theme_bw() +
-  labs(x = "", y = "Mean Greenness (w/in 30 m buffer)") +
+ggplot(dat2, aes(x = green, color = z.post.thresh)) +
+  geom_density(alpha = 0.25, size = 1) +
+  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey")) +
+  labs(x = "Mean Greenness (w/in 30 m buffer)", y = "Density") +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"),
@@ -451,15 +445,10 @@ ggplot(dat2, aes(x = z.post.thresh, y = green, fill = z.post.thresh)) +
 
 
 ## Wetness by behavioral state
-ggplot(dat2, aes(x = z.post.thresh, y = wet, fill = z.post.thresh)) +
-  geom_violin(alpha = 0.5) +
-  geom_jitter(aes(color = z.post.thresh), width = 0.25, height = 0, alpha = 0.25) +
-  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
-                    guide = F) +
-  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"),
-                     guide = F) +
-  theme_bw() +
-  labs(x = "", y = "Mean Wetness (w/in 30 m buffer)") +
+ggplot(dat2, aes(x = wet, color = z.post.thresh)) +
+  geom_density(alpha = 0.25, size = 1) +
+  scale_color_manual("", values = c(viridis(n=4, option = 'inferno'), "grey")) +
+  labs(x = "Mean Wetness (w/in 30 m buffer)", y = "Density") +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
         strip.text = element_text(size = 12, face = "bold"),
@@ -506,15 +495,15 @@ coeffs.st.su$coef.names<- rownames(coeffs.st.su)
 coeffs.st.su$coef.names<- factor(coeffs.st.su$coef.names,
                                  levels = unique(coeffs.st.su$coef.names))
 
-ggplot(data=coeffs.st.su, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+p.st.su<- ggplot(data=coeffs.st.su, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
   ylim(c(0,2)) +
-  annotate(geom = "text", x = "wet", y = 1.5, label = "bold(Slow-Uniform)",
-           parse = T, size = 5) +
-  annotate(geom = "text", x = "wet", y = 0.5, label = "bold(Slow-Turn)",
-           parse = T, size = 5) +
+  annotate(geom = "text", x = 1.5, y = 1.5, label = "bold(Slow-Uniform)",
+           parse = T, size = 4) +
+  annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Slow-Turn)",
+           parse = T, size = 4) +
   theme_bw() +
   scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
@@ -544,15 +533,15 @@ coeffs.st.exp$coef.names<- rownames(coeffs.st.exp)
 coeffs.st.exp$coef.names<- factor(coeffs.st.exp$coef.names,
                                  levels = unique(coeffs.st.exp$coef.names))
 
-ggplot(data=coeffs.st.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+p.st.exp<- ggplot(data=coeffs.st.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0.5,1.75)) +
-  annotate(geom = "text", x = "wet", y = 1.3, label = "bold(Exploratory)",
-           parse = T, size = 5) +
-  annotate(geom = "text", x = "wet", y = 0.65, label = "bold(Slow-Turn)",
-           parse = T, size = 5) +
+  ylim(c(0.25,1.75)) +
+  annotate(geom = "text", x = 1.5, y = 1.3, label = "bold(Exploratory)",
+           parse = T, size = 4) +
+  annotate(geom = "text", x = 1.5, y = 0.65, label = "bold(Slow-Turn)",
+           parse = T, size = 4) +
   theme_bw() +
   scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
@@ -581,15 +570,15 @@ coeffs.st.t$coef.names<- rownames(coeffs.st.t)
 coeffs.st.t$coef.names<- factor(coeffs.st.t$coef.names,
                                   levels = unique(coeffs.st.t$coef.names))
 
-ggplot(data=coeffs.st.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+p.st.t<- ggplot(data=coeffs.st.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
   ylim(c(0,2)) +
-  annotate(geom = "text", x = "wet", y = 1.6, label = "bold(Transit)",
-           parse = T, size = 5) +
-  annotate(geom = "text", x = "wet", y = 0.4, label = "bold(Slow-Turn)",
-           parse = T, size = 5) +
+  annotate(geom = "text", x = 1.5, y = 1.6, label = "bold(Transit)",
+           parse = T, size = 4) +
+  annotate(geom = "text", x = 1.5, y = 0.4, label = "bold(Slow-Turn)",
+           parse = T, size = 4) +
   theme_bw() +
   scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
@@ -618,15 +607,15 @@ coeffs.su.exp$coef.names<- rownames(coeffs.su.exp)
 coeffs.su.exp$coef.names<- factor(coeffs.su.exp$coef.names,
                                   levels = unique(coeffs.su.exp$coef.names))
 
-ggplot(data=coeffs.su.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+p.su.exp<- ggplot(data=coeffs.su.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
   ylim(c(0.5,1.5)) +
-  annotate(geom = "text", x = "wet", y = 1.3, label = "bold(Exploratory)",
-           parse = T, size = 5) +
-  annotate(geom = "text", x = "wet", y = 0.7, label = "bold(Slow-Uniform)",
-           parse = T, size = 5) +
+  annotate(geom = "text", x = 1.5, y = 1.3, label = "bold(Exploratory)",
+           parse = T, size = 4) +
+  annotate(geom = "text", x = 1.5, y = 0.7, label = "bold(Slow-Uniform)",
+           parse = T, size = 4) +
   theme_bw() +
   scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
@@ -656,15 +645,15 @@ coeffs.su.t$coef.names<- rownames(coeffs.su.t)
 coeffs.su.t$coef.names<- factor(coeffs.su.t$coef.names,
                                   levels = unique(coeffs.su.t$coef.names))
 
-ggplot(data=coeffs.su.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+p.su.t<- ggplot(data=coeffs.su.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0.25,1.75)) +
-  annotate(geom = "text", x = "wet", y = 1.4, label = "bold(Transit)",
-           parse = T, size = 5) +
-  annotate(geom = "text", x = "wet", y = 0.5, label = "bold(Slow-Uniform)",
-           parse = T, size = 5) +
+  ylim(c(0,2)) +
+  annotate(geom = "text", x = 1.5, y = 1.4, label = "bold(Transit)",
+           parse = T, size = 4) +
+  annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Slow-Uniform)",
+           parse = T, size = 4) +
   theme_bw() +
   scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
@@ -694,15 +683,15 @@ coeffs.exp.t$coef.names<- rownames(coeffs.exp.t)
 coeffs.exp.t$coef.names<- factor(coeffs.exp.t$coef.names,
                                   levels = unique(coeffs.exp.t$coef.names))
 
-ggplot(data=coeffs.exp.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+p.exp.t<- ggplot(data=coeffs.exp.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
   geom_hline(yintercept = 1) +
   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
   geom_point(position = position_dodge(0.55), size=2) +
   ylim(c(0.25,1.75)) +
-  annotate(geom = "text", x = "wet", y = 1.4, label = "bold(Transit)",
-           parse = T, size = 5) +
-  annotate(geom = "text", x = "wet", y = 0.5, label = "bold(Exploratory)",
-           parse = T, size = 5) +
+  annotate(geom = "text", x = 1.5, y = 1.4, label = "bold(Transit)",
+           parse = T, size = 4) +
+  annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Exploratory)",
+           parse = T, size = 4) +
   theme_bw() +
   scale_x_discrete(labels = c("Greenness","Wetness")) +
   coord_flip() +
@@ -712,6 +701,12 @@ ggplot(data=coeffs.exp.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
         panel.grid = element_blank())
 
 
+
+### Make composite plot of all relationships
+
+plot_grid(p.st.su, p.st.exp, p.st.t,
+          p.su.exp, p.su.t, p.exp.t,
+          nrow = 2)
 
 
 
