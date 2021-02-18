@@ -289,14 +289,12 @@ rasterVis::levelplot(mosaic.bright, at=breaks, col.regions=cols, main="Bright") 
 
 ### If wanting to aggregate into seasons:
 
-# May is Fall
-# Jun/Jul/Aug are Winter
-# Sep/Oct/Nov are Spring
-# Dec/Jan are Summer
+# Wet = Oct - March
+# Dry = April - Sep
 
-season.ind<- c("Fall", rep("Winter",3), rep("Spring",3), rep("Summer",2))
+season.ind<- ifelse(names(mosaic.bright) %in% month.abb[c(10:12,1:3)], "Wet", "Dry")
 bright.season<- stackApply(mosaic.bright, season.ind, fun = mean)
-names(bright.season)<- c("Fall","Winter","Spring","Summer")
+names(bright.season)<- c("Dry","Wet")
 rasterVis::levelplot(bright.season, at=breaks, col.regions=cols, main="Bright") +
   layer(sp.points(dat, cex=0.1, pch = 16, col = alpha("black", 0.5)))
 
@@ -424,14 +422,12 @@ rasterVis::levelplot(mosaic.green, at=breaks, col.regions=cols, main="Green") +
 
 ### If wanting to aggregate into seasons:
 
-# May is Fall
-# Jun/Jul/Aug are Winter
-# Sep/Oct/Nov are Spring
-# Dec/Jan are Summer
+# Wet = Oct - March
+# Dry = April - Sep
 
-season.ind<- c("Fall", rep("Winter",3), rep("Spring",3), rep("Summer",2))
+season.ind<- ifelse(names(mosaic.green) %in% month.abb[c(10:12,1:3)], "Wet", "Dry")
 green.season<- stackApply(mosaic.green, season.ind, fun = mean)
-names(green.season)<- c("Fall","Winter","Spring","Summer")
+names(green.season)<- c("Dry","Wet")
 rasterVis::levelplot(green.season, at=breaks, col.regions=cols, main="Green") +
   layer(sp.points(dat, cex=0.1, pch = 16, col = alpha("black", 0.5)))
 
@@ -561,14 +557,12 @@ rasterVis::levelplot(mosaic.wet, at=breaks, col.regions=cols, main="Wet") +
 
 ### If wanting to aggregate into seasons:
 
-# May is Fall
-# Jun/Jul/Aug are Winter
-# Sep/Oct/Nov are Spring
-# Dec/Jan are Summer
+# Wet = Oct - March
+# Dry = April - Sep
 
-season.ind<- c("Fall", rep("Winter",3), rep("Spring",3), rep("Summer",2))
+season.ind<- ifelse(names(mosaic.wet) %in% month.abb[c(10:12,1:3)], "Wet", "Dry")
 wet.season<- stackApply(mosaic.wet, season.ind, fun = mean)
-names(wet.season)<- c("Fall","Winter","Spring","Summer")
+names(wet.season)<- c("Dry","Wet")
 rasterVis::levelplot(wet.season, at=breaks, col.regions=cols, main="Wet") +
   layer(sp.points(dat, cex=0.1, pch = 16, col = alpha("black", 0.5)))
 

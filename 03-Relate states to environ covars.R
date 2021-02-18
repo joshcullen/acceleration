@@ -7,7 +7,7 @@ library(viridis)
 library(ks)
 library(cowplot)
 
-
+source('helper functions.R')
 
 
 #################
@@ -20,37 +20,69 @@ dat<-  dat %>%
   mutate(across(c('z.map','z.post.thresh','z.post.max'), factor,
                 levels = c("Slow-Turn","Slow-Unif","Exploratory","Transit","Unclassified"))
   )
+dat$date<- as_datetime(dat$date, tz = "UTC")
 dat$month<- month.abb[month(dat$date)]
 dat$month<- factor(dat$month, levels = month.abb[c(5:12,1)])
 dat$season<- ifelse(dat$month %in% c(month.abb[3:5]), "Fall",
                     ifelse(dat$month %in% c(month.abb[6:8]), "Winter",
                            ifelse(dat$month %in% c(month.abb[9:11]), "Spring", "Summer")))
 dat$season<- factor(dat$season, levels = c("Fall","Winter","Spring","Summer"))
+dat$season2<- ifelse(dat$month %in% month.abb[c(10:12,1:3)], "Rainy", "Dry")
+
 
 
 ### Extract all available environ covars and check for correlations before deciding which to include
 
 #LULC
-lulc<- raster('cheiann_UTM1.tif')
-names(lulc)<- 'lulc'
+flood.lulc<- raster('cheiann_UTM1.tif')
+names(flood.lulc)<- 'lulc'
 
 #crop raster closer to armadillo relocs
-lulc<- crop(lulc, extent(dat %>% 
+flood.lulc<- crop(flood.lulc, extent(dat %>% 
                            summarize(xmin = min(x) - 3000,
                                      xmax = max(x) + 3000,
                                      ymin = min(y) - 3000,
                                      ymax = max(y) + 3000) %>% 
                            unlist()))
-lulc.df<- as.data.frame(lulc, xy = TRUE)
+flood.lulc.df<- as.data.frame(flood.lulc, xy = TRUE)
 
+
+dry.lulc<- raster('secann_UTM1.tif')
+names(dry.lulc)<- 'lulc'
+dry.lulc<- crop(dry.lulc, flood.lulc)
+dry.lulc.df<- as.data.frame(dry.lulc, xy = TRUE)
+
+
+# Plot seasonal LULC
+lulc<- rbind(dry.lulc.df, flood.lulc.df)
+lulc$season<- rep(c("Dry","Wet"), each = nrow(dry.lulc.df))
+
+
+ggplot() +
+  geom_raster(data = lulc, aes(x, y, fill = factor(lulc))) +
+  scale_fill_manual("", values = c("darkgreen","burlywood4","darkolivegreen3","lightskyblue1"),
+                    na.value = "transparent",
+                    labels = c("Forest", "Closed Savanna", "Open Savanna", "Floodable","")) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "right",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold")) +
+  facet_wrap(~ season)
 
 
 #NDWI
 setwd("~/Documents/Snail Kite Project/Data/R Scripts/ValleLabUF/resist_avg")
 
 ndwi<- brick('GiantArm_ndwi_season.grd')
-ndwi<- resample(ndwi, lulc, method = "bilinear")
-compareRaster(lulc, ndwi)
+ndwi<- resample(ndwi, flood.lulc, method = "bilinear")
+compareRaster(flood.lulc, ndwi)
 
 ndwi.df<- as.data.frame(ndwi, xy = T)
 ndwi.df2<- pivot_longer(ndwi.df, cols = -c(x,y), names_to = "season", values_to = "ndwi")
@@ -61,8 +93,8 @@ ndwi.df2$season<- factor(ndwi.df2$season, levels = names(ndwi))
 #NDVI
 
 ndvi<- brick('GiantArm_ndvi_season.grd')
-ndvi<- resample(ndvi, lulc, method = "bilinear")
-compareRaster(lulc, ndvi)
+ndvi<- resample(ndvi, flood.lulc, method = "bilinear")
+compareRaster(flood.lulc, ndvi)
 
 ndvi.df<- as.data.frame(ndvi, xy = T)
 ndvi.df2<- pivot_longer(ndvi.df, cols = -c(x,y), names_to = "season", values_to = "ndvi")
@@ -75,8 +107,8 @@ setwd("~/Documents/Snail Kite Project/Data/R Scripts/acceleration")
 #Tasseled Cap Brightness
 
 bright<- brick('GiantArm_tcbright_season.grd')
-bright<- resample(bright, lulc, method = "bilinear")
-compareRaster(lulc, bright)
+bright<- resample(bright, flood.lulc, method = "bilinear")
+compareRaster(flood.lulc, bright)
 
 bright.df<- as.data.frame(bright, xy = T)
 bright.df2<- pivot_longer(bright.df, cols = -c(x,y), names_to = "season", values_to = "bright")
@@ -87,8 +119,8 @@ bright.df2$season<- factor(bright.df2$season, levels = names(bright))
 #Tasseled Cap Greenness
 
 green<- brick('GiantArm_tcgreen_season.grd')
-green<- resample(green, lulc, method = "bilinear")
-compareRaster(lulc, green)
+green<- resample(green, flood.lulc, method = "bilinear")
+compareRaster(flood.lulc, green)
 
 green.df<- as.data.frame(green, xy = T)
 green.df2<- pivot_longer(green.df, cols = -c(x,y), names_to = "season", values_to = "green")
@@ -99,8 +131,8 @@ green.df2$season<- factor(green.df2$season, levels = names(green))
 #Tasseled Cap Wetness
 
 wet<- brick('GiantArm_tcwet_season.grd')
-wet<- resample(wet, lulc, method = "bilinear")
-compareRaster(lulc, wet)
+wet<- resample(wet, flood.lulc, method = "bilinear")
+compareRaster(flood.lulc, wet)
 
 wet.df<- as.data.frame(wet, xy = T)
 wet.df2<- pivot_longer(wet.df, cols = -c(x,y), names_to = "season", values_to = "wet")
@@ -111,17 +143,17 @@ wet.df2$season<- factor(wet.df2$season, levels = names(wet))
 #Elevation
 dem<- raster('giantarm_dem.tif')
 names(dem)<- 'elev'
-dem<- resample(dem, lulc, method = "bilinear")
-compareRaster(lulc, dem)
+dem<- resample(dem, flood.lulc, method = "bilinear")
+compareRaster(flood.lulc, dem)
 dem.df<- as.data.frame(dem, xy = TRUE)
 
 
 
-## Viz behavioral states over LULC map
+## Viz behavioral states over (Dry) LULC map
 
 #by z.post.thresh
 ggplot(data = dat, aes(x, y)) +
-  geom_raster(data = lulc.df, aes(x, y, fill = factor(lulc))) +
+  geom_raster(data = dry.lulc.df, aes(x, y, fill = factor(lulc))) +
   scale_fill_manual("", values = c("darkgreen","burlywood4","darkolivegreen3","lightskyblue1"),
                     na.value = "transparent",
                     labels = c("Forest", "Closed Savanna", "Open Savanna", "Floodable","")) +
@@ -210,7 +242,7 @@ kde$state<- factor(kde$state, levels = c("Slow-Turn", "Slow-Unif", "Exploratory"
 
 #facet of all mapped KDE by state
 ggplot() +
-  geom_raster(data = lulc.df, aes(x, y, fill = factor(lulc)), alpha = 0.5) +
+  geom_raster(data = flood.lulc.df, aes(x, y, fill = factor(lulc)), alpha = 0.5) +
   scale_fill_manual("", values = c("darkgreen","burlywood4","darkolivegreen3","lightskyblue1"),
                     na.value = "transparent",
                     labels = c("Forest", "Closed Savanna", "Open Savanna", "Floodable","")) +
@@ -238,9 +270,15 @@ ggplot() +
 ### Extract environ covars for all obs ###
 ##########################################
 
-# Proportions LULC w/in 30 m buffer
-extr.lulc<- extract(lulc, dat[,c('x','y')], buffer = 30)  #extract lulc w/in 30 m buffer
-extr.lulc2<- map(extr.lulc, ~{prop.table(table(.))}) %>%  #convert to proportions lulc
+dry.ind<- which(dat$season2 == "Dry")
+
+# Proportions LULC w/in 30 m buffer (by season)
+
+#Flood
+flood.extr.lulc<- extract(flood.lulc, dat[,c('x','y')], buffer = 30)  #extract lulc w/in 30 m buffer
+dry.extr.lulc<- extract(dry.lulc, dat[,c('x','y')], buffer = 30)
+
+extr.lulc2<- map(flood.extr.lulc, ~{prop.table(table(.))}) %>%  #convert to proportions lulc
   map(., ~{
     mat<- matrix(0, 1, 4)
     mat[1, as.numeric(names(.x))]<- .x
@@ -249,7 +287,20 @@ extr.lulc2<- map(extr.lulc, ~{prop.table(table(.))}) %>%  #convert to proportion
     df
     }) %>% 
   bind_rows()
+dry.lulc2<- map(dry.extr.lulc, ~{prop.table(table(.))}) %>%  #convert to proportions lulc
+  map(., ~{
+    mat<- matrix(0, 1, 4)
+    mat[1, as.numeric(names(.x))]<- .x
+    
+    df<- data.frame(mat)
+    df
+  }) %>% 
+  bind_rows()
+
+extr.lulc2[dry.ind,]<- dry.lulc2[dry.ind,]
 names(extr.lulc2)<- c("Forest", "Closed_Savanna", "Open_Savanna", "Floodable")
+
+
 
 
 # Mean elevation w/in 30 m buffer
@@ -277,7 +328,7 @@ dat2<- cbind(dat, extr.lulc2, elev = extr.dem, extr.dyn.covars)
 
 
 # Check correlations among covariates (remove vars if |corr| > 0.7)
-PerformanceAnalytics::chart.Correlation(dat2[,16:25])
+PerformanceAnalytics::chart.Correlation(dat2[,17:26])
 ## based on high corrs, removing NDWI, NDVI, and Brightness
 ## due to low level of added information, also removing LULC and elevation
 
@@ -333,6 +384,7 @@ ggplot(df.season, aes(z.post.thresh, freq, fill = z.post.thresh)) +
 
 df.TON<- dat2 %>% 
   filter(z.post.thresh != "Unclassified") %>% 
+  # mutate(date = date - hours(4)) %>% 
   mutate(hour1 = hour(date)) %>% 
   mutate_at('hour1', factor, levels = c(12:23,0:11)) %>% 
   mutate_at('z.post.thresh', droplevels) %>% 
@@ -711,49 +763,72 @@ plot_grid(p.st.su, p.st.exp, p.st.t,
 
 
 
-############################################
-### Create spatial predictions of states ###
-############################################
+##########################################################
+### Explore Relationships between Vegetation and Water ###
+##########################################################
 
-## fit data using ordinal logistic regression
-library(MASS)
+#Create 2D KDE of NDVI-NDWI and Greenness-Wetness to investigate relationships and how this could impact interpretation of results
 
-dat3$z.post.thresh<- factor(as.character(dat3$z.post.thresh),
-                            levels = unique(dat3$z.post.thresh))
+ggplot(data = dat2 %>% filter(z.post.thresh != "Unclassified"), aes(ndvi,ndwi)) +
+  geom_density2d_filled(contour_var = "ndensity") +
+  theme_bw() +
+  labs(x = "NDVI", y = "NDWI") +
+  facet_grid(z.post.thresh ~ season) +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"))
 
-ord.mod<- polr(z.post.thresh ~ elev + green + wet,
-               data = dat3, Hess = T)
-summary(ord.mod)
+ggplot(data = dat2 %>% filter(z.post.thresh != "Unclassified"), aes(green,wet)) +
+  geom_density2d_filled(contour_var = "ndensity") +
+  theme_bw() +
+  labs(x = "Greenness", y = "Wetness") +
+  facet_grid(z.post.thresh ~ season) +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"))
 
 
-exp(cbind(fit = coef(ord.mod), confint(ord.mod)))
+
+###############################################
+### Calculate daily displacements by season ###
+###############################################
+
+# Define nocturnal activity periods; if not already converted, substract 4 hours from UTC time
+dat2$date<- dat2$date - hours(4)
+dat2<- nocturnal_period(dat2)
+
+#NEED TO FIX NOCTURNAL_PERIOD()
 
 
+############################################################
+### Extract Values of Continuous Variables by LULC Class ###
+############################################################
 
-## make spatial predictions
+covs<- stack(green[[1]], wet[[1]], ndvi[[1]], ndwi[[1]], bright[[1]], dem)
+names(covs)<- c("Greenness", "Wetness", "NDVI", "NDWI", "Brightness", "Elevation")
+flood.lulc.list<- list()
 
-#LULC
-lulc.mat<- model.matrix.lm(~factor(getValues(lulc)) + 0, na.action = "na.pass")
-colnames(lulc.mat)<- c("Forest", "Closed_Savanna","Open_Savanna","Floodable")
-lulc.mat2<- data.frame(lulc.mat) %>% 
-  dplyr::select(-Closed_Savanna)
+for (i in 1:max(getValues(flood.lulc), na.rm = T)) {
+  
+  ind<- which(getValues(flood.lulc) == i)
+  
+  flood.lulc.list[[i]]<- data.frame(extract(covs, ind), class = i)
+}
 
-#NDWI
-ndwi.fall<- ndwi
+flood.lulc.contvals<- bind_rows(flood.lulc.list)
+flood.lulc.contvals$class<- factor(flood.lulc.contvals$class)
+levels(flood.lulc.contvals$class)<- c("Forest", "Closed Savanna", "Open Savanna", "Floodable")
+flood.lulc.contvals<- flood.lulc.contvals %>% 
+  pivot_longer(cols = -class, names_to = "covar", values_to = "value")
 
-pred.fall<- predict(ord.mod, data.frame(elev = scale(dem.df$elev),
-                                   green = scale(green.df$Fall),
-                                   wet = scale(wet.df$Fall)), type = "probs")
-pred.winter<- predict(ord.mod, cbind(lulc.mat2, ndwi = ndwi.df$Winter), type = "probs")
-pred.spring<- predict(ord.mod, cbind(lulc.mat2, ndwi = ndwi.df$Spring), type = "probs")
-pred.summer<- predict(ord.mod, cbind(lulc.mat2, ndwi = ndwi.df$Summer), type = "probs")
+ggplot(data=flood.lulc.contvals, aes(x=value, fill = class)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_viridis_d("") +
+  labs(x = "Value", y = "Density") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 10)) +
+  facet_wrap(~ covar, scales = "free")
 
-# pred.fall2<- apply(pred.fall, 1, function(x) ifelse(max(x) > 0.75,
-#                                        names(pred.fall)[which.max(x)],
-#                                        NA))
-apply(pred.fall, 2, function(x) max(x, na.rm = T))
-apply(pred.winter, 2, function(x) max(x, na.rm = T))
-apply(pred.spring, 2, function(x) max(x, na.rm = T))
-apply(pred.summer, 2, function(x) max(x, na.rm = T))
-
-### based on model predictions, none of the pixel estimates are above 50% probability

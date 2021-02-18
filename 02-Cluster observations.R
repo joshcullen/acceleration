@@ -9,7 +9,7 @@ library(lubridate)
 #############################
 
 dat<- read.csv('Giant Armadillo Binned Data.csv', as.is = T)
-dat$date<- as_datetime(dat$date, tz = "UTC")
+dat$date<- as_datetime(dat$date, tz = "Etc/GMT+4")  #change timezone to subtract 4 hours
 
 
 dat2<- subset(dat, select = c(sl.cat, ta.cat, act.cat))
@@ -36,7 +36,7 @@ nmaxclust=10  #number of maximum possible states (clusters) present
 # Run model
 dat.res<- cluster_obs(dat=dat2, alpha=alpha, ngibbs=ngibbs, nmaxclust=nmaxclust,
                       nburn=nburn)
-# takes 19 min to run 20,000 iterations
+# takes 18 min to run 20,000 iterations
 
 # Inspect traceplot of log-likelihood
 post.seq=(nburn + 1):ngibbs
@@ -97,7 +97,7 @@ ggplot(behav.res %>% filter(behav %in% 1:max.gr), aes(x = bin, y = prop, fill = 
 
 
 ## Attribute behaviors to states and extract each of the different estimates
-# Using MAP estimate, threshold of 75% assignments from posterior, and most common state
+# Using MAP estimate, threshold of 90% assignments from posterior, and most common state
 z.post<- as.matrix(dat.res$z.posterior)
 z.post2<- t(apply(z.post, 1, function(x) x/sum(x)))
 thresh<- 0.75
