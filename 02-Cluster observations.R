@@ -13,7 +13,7 @@ dat$date<- as_datetime(dat$date, tz = "Etc/GMT+4")  #change timezone to subtract
 
 
 dat2<- subset(dat, select = c(sl.cat, ta.cat, act.cat))
-
+# dat3<- subset(dat, select = c(sl.cat, ta.cat))  #check states for only SL and TA
 
 ## Map available points for each ID
 ggplot(dat, aes(easting, northing, color = id)) +
@@ -74,6 +74,8 @@ for (i in sample(post.seq, 4)) {
 # Extract bin estimates for each possible state from the `phi` matrix of the model results
 behav.res<- get_behav_hist(dat = dat.res, nburn = nburn, ngibbs = ngibbs, nmaxclust = nmaxclust,
                            var.names = c("Speed","Turning Angle","Activity Counts"))
+# behav.res<- get_behav_hist(dat = dat.res, nburn = nburn, ngibbs = ngibbs, nmaxclust = nmaxclust,
+#                            var.names = c("Speed","Turning Angle"))
 
 behav.res$behav<- factor(behav.res$behav, levels = 1:nmaxclust)
 
