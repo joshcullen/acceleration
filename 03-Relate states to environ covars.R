@@ -6,6 +6,7 @@ library(raster)
 library(viridis)
 library(ks)
 library(cowplot)
+library(mgcv)
 
 source('helper functions.R')
 
@@ -92,11 +93,16 @@ ndwi.df2$season<- factor(ndwi.df2$season, levels = names(ndwi))
 
 #NDVI
 
-ndvi<- brick('GiantArm_ndvi_season.grd')
+ndvi<- brick('GiantArm_ndvi_monthly.grd')
 ndvi<- resample(ndvi, flood.lulc, method = "bilinear")
 compareRaster(flood.lulc, ndvi)
 
-ndvi.df<- as.data.frame(ndvi, xy = T)
+#convert from months to wet/dry seasons
+season.ind<- ifelse(names(ndvi) %in% month.abb[c(10:12,1:3)], "Rainy", "Dry")
+ndvi2<- stackApply(ndvi, season.ind, fun = mean)
+names(ndvi2)<- c("Dry","Rainy")
+
+ndvi.df<- as.data.frame(ndvi2, xy = T)
 ndvi.df2<- pivot_longer(ndvi.df, cols = -c(x,y), names_to = "season", values_to = "ndvi")
 ndvi.df2$season<- factor(ndvi.df2$season, levels = names(ndvi))
 
@@ -307,13 +313,13 @@ names(extr.lulc2)<- c("Forest", "Closed_Savanna", "Open_Savanna", "Floodable")
 extr.dem<- extract(dem, dat[,c('x','y')], buffer = 30, fun = mean)
 
 
-# Mean NDWI, NDVI, Brightness, Greenness, and Wetness w/in 30 m buffer
-seasons<- names(ndwi)
-dyn.covars<- list(ndwi, ndvi, bright, green, wet)
-names(dyn.covars)<- c("ndwi", "ndvi", "bright", "green", "wet")
+# Mean NDVI w/in 30 m buffer
+seasons<- names(ndvi2)
+dyn.covars<- list(ndvi2)
+names(dyn.covars)<- c("ndvi")
 extr.dyn.covars<- matrix(NA, nrow(dat), length(dyn.covars))
 for (i in 1:length(seasons)) {
-  ind<- which(dat$season == seasons[i])
+  ind<- which(dat$season2 == seasons[i])
   tmp<- map(dyn.covars, function(x) x[[i]]) %>% 
     stack()
   
@@ -328,7 +334,7 @@ dat2<- cbind(dat, extr.lulc2, elev = extr.dem, extr.dyn.covars)
 
 
 # Check correlations among covariates (remove vars if |corr| > 0.7)
-PerformanceAnalytics::chart.Correlation(dat2[,17:26])
+PerformanceAnalytics::chart.Correlation(dat2[,17:22])
 ## based on high corrs, removing NDWI, NDVI, and Brightness
 ## due to low level of added information, also removing LULC and elevation
 
@@ -524,7 +530,8 @@ plot(dat2$z.post.thresh, dat2$wet)
 #remove observations w/ "Unclassified" state (based on z.post.thresh)
 dat3<- dat2 %>% 
   filter(z.post.thresh != "Unclassified") %>% 
-  mutate(across(.cols = c(Forest:wet), scale))
+  mutate(across(.cols = c(Forest:ndvi), scale)) %>% 
+  mutate(across(c(id,season2), factor))
 
 
 
@@ -534,35 +541,38 @@ dat.st.su<- dat3 %>%
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Slow-Unif")
 dat.st.su$state<- ifelse(dat.st.su$z.post.thresh == "Slow-Turn", 0, 1)
 table(dat.st.su$id, dat.st.su$state)  #check n per combo
-st.su.mod<- glm(state ~ green + wet + id,
-                data = dat.st.su, family = binomial)
+st.su.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+                  s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
+                  s(id, bs = "re"),
+                data = dat.st.su, family = binomial, method = "REML")
 summary(st.su.mod)
+plot(st.su.mod, pages = 1, shade = T, seWithMean = T)
 
 # Slow-Unif as ref
 ## odds ratios and 95% CI
-coeffs.st.su<- data.frame(exp(cbind(fit = coef(st.su.mod), confint(st.su.mod))))
-coeffs.st.su<- coeffs.st.su[2:3,]
-names(coeffs.st.su)[2:3]<- c("Lower","Upper")
-coeffs.st.su$coef.names<- rownames(coeffs.st.su)
-coeffs.st.su$coef.names<- factor(coeffs.st.su$coef.names,
-                                 levels = unique(coeffs.st.su$coef.names))
-
-p.st.su<- ggplot(data=coeffs.st.su, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
-  geom_hline(yintercept = 1) +
-  geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
-  geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0,2)) +
-  annotate(geom = "text", x = 1.5, y = 1.5, label = "bold(Slow-Uniform)",
-           parse = T, size = 4) +
-  annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Slow-Turn)",
-           parse = T, size = 4) +
-  theme_bw() +
-  scale_x_discrete(labels = c("Greenness","Wetness")) +
-  coord_flip() +
-  labs(x="", y="Odds Ratio") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 18),
-        panel.grid = element_blank())
+# coeffs.st.su<- data.frame(exp(cbind(fit = coef(st.su.mod), confint(st.su.mod))))
+# coeffs.st.su<- coeffs.st.su[2:3,]
+# names(coeffs.st.su)[2:3]<- c("Lower","Upper")
+# coeffs.st.su$coef.names<- rownames(coeffs.st.su)
+# coeffs.st.su$coef.names<- factor(coeffs.st.su$coef.names,
+#                                  levels = unique(coeffs.st.su$coef.names))
+# 
+# p.st.su<- ggplot(data=coeffs.st.su, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+#   geom_hline(yintercept = 1) +
+#   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
+#   geom_point(position = position_dodge(0.55), size=2) +
+#   ylim(c(0,2)) +
+#   annotate(geom = "text", x = 1.5, y = 1.5, label = "bold(Slow-Uniform)",
+#            parse = T, size = 4) +
+#   annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Slow-Turn)",
+#            parse = T, size = 4) +
+#   theme_bw() +
+#   scale_x_discrete(labels = c("Greenness","Wetness")) +
+#   coord_flip() +
+#   labs(x="", y="Odds Ratio") +
+#   theme(axis.text = element_text(size = 14),
+#         axis.title = element_text(size = 18),
+#         panel.grid = element_blank())
 
 
 
@@ -572,35 +582,38 @@ dat.st.exp<- dat3 %>%
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Exploratory")
 dat.st.exp$state<- ifelse(dat.st.exp$z.post.thresh == "Slow-Turn", 0, 1)
 table(dat.st.exp$id, dat.st.exp$state)  #check n per combo
-st.exp.mod<- glm(state ~ green + wet + id,
-                data = dat.st.exp, family = binomial)
+st.exp.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+                  s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
+                  s(id, bs = "re"),
+                data = dat.st.exp, family = binomial, method = "REML")
 summary(st.exp.mod)
+plot(st.exp.mod, pages = 1, shade = T, seWithMean = T)
 
 # Exploratory as ref
 ## odds ratios and 95% CI
-coeffs.st.exp<- data.frame(exp(cbind(fit = coef(st.exp.mod), confint(st.exp.mod))))
-coeffs.st.exp<- coeffs.st.exp[2:3,]
-names(coeffs.st.exp)[2:3]<- c("Lower","Upper")
-coeffs.st.exp$coef.names<- rownames(coeffs.st.exp)
-coeffs.st.exp$coef.names<- factor(coeffs.st.exp$coef.names,
-                                 levels = unique(coeffs.st.exp$coef.names))
-
-p.st.exp<- ggplot(data=coeffs.st.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
-  geom_hline(yintercept = 1) +
-  geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
-  geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0.25,1.75)) +
-  annotate(geom = "text", x = 1.5, y = 1.3, label = "bold(Exploratory)",
-           parse = T, size = 4) +
-  annotate(geom = "text", x = 1.5, y = 0.65, label = "bold(Slow-Turn)",
-           parse = T, size = 4) +
-  theme_bw() +
-  scale_x_discrete(labels = c("Greenness","Wetness")) +
-  coord_flip() +
-  labs(x="", y="Odds Ratio") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 18),
-        panel.grid = element_blank())
+# coeffs.st.exp<- data.frame(exp(cbind(fit = coef(st.exp.mod), confint(st.exp.mod))))
+# coeffs.st.exp<- coeffs.st.exp[2:3,]
+# names(coeffs.st.exp)[2:3]<- c("Lower","Upper")
+# coeffs.st.exp$coef.names<- rownames(coeffs.st.exp)
+# coeffs.st.exp$coef.names<- factor(coeffs.st.exp$coef.names,
+#                                  levels = unique(coeffs.st.exp$coef.names))
+# 
+# p.st.exp<- ggplot(data=coeffs.st.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+#   geom_hline(yintercept = 1) +
+#   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
+#   geom_point(position = position_dodge(0.55), size=2) +
+#   ylim(c(0.25,1.75)) +
+#   annotate(geom = "text", x = 1.5, y = 1.3, label = "bold(Exploratory)",
+#            parse = T, size = 4) +
+#   annotate(geom = "text", x = 1.5, y = 0.65, label = "bold(Slow-Turn)",
+#            parse = T, size = 4) +
+#   theme_bw() +
+#   scale_x_discrete(labels = c("Greenness","Wetness")) +
+#   coord_flip() +
+#   labs(x="", y="Odds Ratio") +
+#   theme(axis.text = element_text(size = 14),
+#         axis.title = element_text(size = 18),
+#         panel.grid = element_blank())
 
 
 
@@ -609,35 +622,38 @@ dat.st.t<- dat3 %>%
   filter(z.post.thresh == "Slow-Turn" | z.post.thresh == "Transit")
 dat.st.t$state<- ifelse(dat.st.t$z.post.thresh == "Slow-Turn", 0, 1)
 table(dat.st.t$id, dat.st.t$state)  #check n per combo
-st.t.mod<- glm(state ~ green + wet + id,
-                 data = dat.st.t, family = binomial)
+st.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
+                   s(id, bs = "re"),
+                 data = dat.st.t, family = binomial, method = "REML")
 summary(st.t.mod)
+plot(st.t.mod, pages = 1, shade = T, seWithMean = T)
 
 # Transit as ref
 ## odds ratios and 95% CI
-coeffs.st.t<- data.frame(exp(cbind(fit = coef(st.t.mod), confint(st.t.mod))))
-coeffs.st.t<- coeffs.st.t[2:3,]
-names(coeffs.st.t)[2:3]<- c("Lower","Upper")
-coeffs.st.t$coef.names<- rownames(coeffs.st.t)
-coeffs.st.t$coef.names<- factor(coeffs.st.t$coef.names,
-                                  levels = unique(coeffs.st.t$coef.names))
-
-p.st.t<- ggplot(data=coeffs.st.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
-  geom_hline(yintercept = 1) +
-  geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
-  geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0,2)) +
-  annotate(geom = "text", x = 1.5, y = 1.6, label = "bold(Transit)",
-           parse = T, size = 4) +
-  annotate(geom = "text", x = 1.5, y = 0.4, label = "bold(Slow-Turn)",
-           parse = T, size = 4) +
-  theme_bw() +
-  scale_x_discrete(labels = c("Greenness","Wetness")) +
-  coord_flip() +
-  labs(x="", y="Odds Ratio") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 18),
-        panel.grid = element_blank())
+# coeffs.st.t<- data.frame(exp(cbind(fit = coef(st.t.mod), confint(st.t.mod))))
+# coeffs.st.t<- coeffs.st.t[2:3,]
+# names(coeffs.st.t)[2:3]<- c("Lower","Upper")
+# coeffs.st.t$coef.names<- rownames(coeffs.st.t)
+# coeffs.st.t$coef.names<- factor(coeffs.st.t$coef.names,
+#                                   levels = unique(coeffs.st.t$coef.names))
+# 
+# p.st.t<- ggplot(data=coeffs.st.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+#   geom_hline(yintercept = 1) +
+#   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
+#   geom_point(position = position_dodge(0.55), size=2) +
+#   ylim(c(0,2)) +
+#   annotate(geom = "text", x = 1.5, y = 1.6, label = "bold(Transit)",
+#            parse = T, size = 4) +
+#   annotate(geom = "text", x = 1.5, y = 0.4, label = "bold(Slow-Turn)",
+#            parse = T, size = 4) +
+#   theme_bw() +
+#   scale_x_discrete(labels = c("Greenness","Wetness")) +
+#   coord_flip() +
+#   labs(x="", y="Odds Ratio") +
+#   theme(axis.text = element_text(size = 14),
+#         axis.title = element_text(size = 18),
+#         panel.grid = element_blank())
 
 
 
@@ -646,35 +662,38 @@ dat.su.exp<- dat3 %>%
   filter(z.post.thresh == "Slow-Unif" | z.post.thresh == "Exploratory")
 dat.su.exp$state<- ifelse(dat.su.exp$z.post.thresh == "Slow-Unif", 0, 1)
 table(dat.su.exp$id, dat.su.exp$state)  #check n per combo
-su.exp.mod<- glm(state ~ green + wet + id,
-                 data = dat.su.exp, family = binomial)
+su.exp.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
+                   s(id, bs = "re"),
+                 data = dat.su.exp, family = binomial, method = "REML")
 summary(su.exp.mod)
+plot(su.exp.mod, pages = 1, shade = T, seWithMean = T)
 
 # Exploratory as ref
 ## odds ratios and 95% CI
-coeffs.su.exp<- data.frame(exp(cbind(fit = coef(su.exp.mod), confint(su.exp.mod))))
-coeffs.su.exp<- coeffs.su.exp[2:3,]
-names(coeffs.su.exp)[2:3]<- c("Lower","Upper")
-coeffs.su.exp$coef.names<- rownames(coeffs.su.exp)
-coeffs.su.exp$coef.names<- factor(coeffs.su.exp$coef.names,
-                                  levels = unique(coeffs.su.exp$coef.names))
-
-p.su.exp<- ggplot(data=coeffs.su.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
-  geom_hline(yintercept = 1) +
-  geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
-  geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0.5,1.5)) +
-  annotate(geom = "text", x = 1.5, y = 1.3, label = "bold(Exploratory)",
-           parse = T, size = 4) +
-  annotate(geom = "text", x = 1.5, y = 0.7, label = "bold(Slow-Uniform)",
-           parse = T, size = 4) +
-  theme_bw() +
-  scale_x_discrete(labels = c("Greenness","Wetness")) +
-  coord_flip() +
-  labs(x="", y="Odds Ratio") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 18),
-        panel.grid = element_blank())
+# coeffs.su.exp<- data.frame(exp(cbind(fit = coef(su.exp.mod), confint(su.exp.mod))))
+# coeffs.su.exp<- coeffs.su.exp[2:3,]
+# names(coeffs.su.exp)[2:3]<- c("Lower","Upper")
+# coeffs.su.exp$coef.names<- rownames(coeffs.su.exp)
+# coeffs.su.exp$coef.names<- factor(coeffs.su.exp$coef.names,
+#                                   levels = unique(coeffs.su.exp$coef.names))
+# 
+# p.su.exp<- ggplot(data=coeffs.su.exp, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+#   geom_hline(yintercept = 1) +
+#   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
+#   geom_point(position = position_dodge(0.55), size=2) +
+#   ylim(c(0.5,1.5)) +
+#   annotate(geom = "text", x = 1.5, y = 1.3, label = "bold(Exploratory)",
+#            parse = T, size = 4) +
+#   annotate(geom = "text", x = 1.5, y = 0.7, label = "bold(Slow-Uniform)",
+#            parse = T, size = 4) +
+#   theme_bw() +
+#   scale_x_discrete(labels = c("Greenness","Wetness")) +
+#   coord_flip() +
+#   labs(x="", y="Odds Ratio") +
+#   theme(axis.text = element_text(size = 14),
+#         axis.title = element_text(size = 18),
+#         panel.grid = element_blank())
 
 
 
@@ -684,35 +703,38 @@ dat.su.t<- dat3 %>%
   filter(z.post.thresh == "Slow-Unif" | z.post.thresh == "Transit")
 dat.su.t$state<- ifelse(dat.su.t$z.post.thresh == "Slow-Unif", 0, 1)
 table(dat.su.t$id, dat.su.t$state)  #check n per combo
-su.t.mod<- glm(state ~ green + wet + id,
-                 data = dat.su.t, family = binomial)
+su.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
+                   s(id, bs = "re"),
+                 data = dat.su.t, family = binomial, method = "REML")
 summary(su.t.mod)
+plot(su.t.mod, pages = 1, shade = T, seWithMean = T)
 
 # Transit as ref
 ## odds ratios and 95% CI
-coeffs.su.t<- data.frame(exp(cbind(fit = coef(su.t.mod), confint(su.t.mod))))
-coeffs.su.t<- coeffs.su.t[2:3,]
-names(coeffs.su.t)[2:3]<- c("Lower","Upper")
-coeffs.su.t$coef.names<- rownames(coeffs.su.t)
-coeffs.su.t$coef.names<- factor(coeffs.su.t$coef.names,
-                                  levels = unique(coeffs.su.t$coef.names))
-
-p.su.t<- ggplot(data=coeffs.su.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
-  geom_hline(yintercept = 1) +
-  geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
-  geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0,2)) +
-  annotate(geom = "text", x = 1.5, y = 1.4, label = "bold(Transit)",
-           parse = T, size = 4) +
-  annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Slow-Uniform)",
-           parse = T, size = 4) +
-  theme_bw() +
-  scale_x_discrete(labels = c("Greenness","Wetness")) +
-  coord_flip() +
-  labs(x="", y="Odds Ratio") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 18),
-        panel.grid = element_blank())
+# coeffs.su.t<- data.frame(exp(cbind(fit = coef(su.t.mod), confint(su.t.mod))))
+# coeffs.su.t<- coeffs.su.t[2:3,]
+# names(coeffs.su.t)[2:3]<- c("Lower","Upper")
+# coeffs.su.t$coef.names<- rownames(coeffs.su.t)
+# coeffs.su.t$coef.names<- factor(coeffs.su.t$coef.names,
+#                                   levels = unique(coeffs.su.t$coef.names))
+# 
+# p.su.t<- ggplot(data=coeffs.su.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+#   geom_hline(yintercept = 1) +
+#   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
+#   geom_point(position = position_dodge(0.55), size=2) +
+#   ylim(c(0,2)) +
+#   annotate(geom = "text", x = 1.5, y = 1.4, label = "bold(Transit)",
+#            parse = T, size = 4) +
+#   annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Slow-Uniform)",
+#            parse = T, size = 4) +
+#   theme_bw() +
+#   scale_x_discrete(labels = c("Greenness","Wetness")) +
+#   coord_flip() +
+#   labs(x="", y="Odds Ratio") +
+#   theme(axis.text = element_text(size = 14),
+#         axis.title = element_text(size = 18),
+#         panel.grid = element_blank())
 
 
 
@@ -722,35 +744,38 @@ dat.exp.t<- dat3 %>%
   filter(z.post.thresh == "Exploratory" | z.post.thresh == "Transit")
 dat.exp.t$state<- ifelse(dat.exp.t$z.post.thresh == "Exploratory", 0, 1)
 table(dat.exp.t$id, dat.exp.t$state)  #check n per combo
-exp.t.mod<- glm(state ~ green + wet + id,
-                 data = dat.exp.t, family = binomial)
+exp.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
+                   s(id, bs = "re"),
+                 data = dat.exp.t, family = binomial, method = "REML")
 summary(exp.t.mod)
+plot(exp.t.mod, pages = 1, shade = T, seWithMean = T)
 
 # Transit as ref
 ## odds ratios and 95% CI
-coeffs.exp.t<- data.frame(exp(cbind(fit = coef(exp.t.mod), confint(exp.t.mod))))
-coeffs.exp.t<- coeffs.exp.t[2:3,]
-names(coeffs.exp.t)[2:3]<- c("Lower","Upper")
-coeffs.exp.t$coef.names<- rownames(coeffs.exp.t)
-coeffs.exp.t$coef.names<- factor(coeffs.exp.t$coef.names,
-                                  levels = unique(coeffs.exp.t$coef.names))
-
-p.exp.t<- ggplot(data=coeffs.exp.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
-  geom_hline(yintercept = 1) +
-  geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
-  geom_point(position = position_dodge(0.55), size=2) +
-  ylim(c(0.25,1.75)) +
-  annotate(geom = "text", x = 1.5, y = 1.4, label = "bold(Transit)",
-           parse = T, size = 4) +
-  annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Exploratory)",
-           parse = T, size = 4) +
-  theme_bw() +
-  scale_x_discrete(labels = c("Greenness","Wetness")) +
-  coord_flip() +
-  labs(x="", y="Odds Ratio") +
-  theme(axis.text = element_text(size = 14),
-        axis.title = element_text(size = 18),
-        panel.grid = element_blank())
+# coeffs.exp.t<- data.frame(exp(cbind(fit = coef(exp.t.mod), confint(exp.t.mod))))
+# coeffs.exp.t<- coeffs.exp.t[2:3,]
+# names(coeffs.exp.t)[2:3]<- c("Lower","Upper")
+# coeffs.exp.t$coef.names<- rownames(coeffs.exp.t)
+# coeffs.exp.t$coef.names<- factor(coeffs.exp.t$coef.names,
+#                                   levels = unique(coeffs.exp.t$coef.names))
+# 
+# p.exp.t<- ggplot(data=coeffs.exp.t, aes(x=coef.names, y=fit, ymin=Lower, ymax=Upper)) +
+#   geom_hline(yintercept = 1) +
+#   geom_errorbar(position = position_dodge(0.55), width = 0, size = 0.75) +
+#   geom_point(position = position_dodge(0.55), size=2) +
+#   ylim(c(0.25,1.75)) +
+#   annotate(geom = "text", x = 1.5, y = 1.4, label = "bold(Transit)",
+#            parse = T, size = 4) +
+#   annotate(geom = "text", x = 1.5, y = 0.5, label = "bold(Exploratory)",
+#            parse = T, size = 4) +
+#   theme_bw() +
+#   scale_x_discrete(labels = c("Greenness","Wetness")) +
+#   coord_flip() +
+#   labs(x="", y="Odds Ratio") +
+#   theme(axis.text = element_text(size = 14),
+#         axis.title = element_text(size = 18),
+#         panel.grid = element_blank())
 
 
 
