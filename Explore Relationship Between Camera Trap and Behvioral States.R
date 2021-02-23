@@ -45,8 +45,8 @@ for (i in 1:length(unique(dat$id))) {
   ind<- numeric()
   for (j in 1:nrow(tmp.cam)) {
     ind<- c(ind,
-            which(tmp.dat$date >= (tmp.cam$date.begin[j] - minutes(2)) & 
-            tmp.dat$date <= (tmp.cam$date.end[j] + minutes(2)))
+            which(tmp.dat$date >= (tmp.cam$date.begin[j] - minutes(3)) & 
+            tmp.dat$date <= (tmp.cam$date.end[j] + minutes(3)))
     )
   }
   
