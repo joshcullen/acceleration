@@ -35,7 +35,7 @@ tmp.GPS
 
 #----------------------------------------
 
-nocturnal_period = function(dat) {
+nocturnal_period = function(dat) {  #needs to be mapped for multiple IDs in current form
   #identify active period for nocturnal animals (who are active on 2 ydays)
   
   dat$period<- NA
@@ -59,10 +59,15 @@ nocturnal_period = function(dat) {
     dat[ind, "period"]<- i-1+oo
   }
   
+  if (any(dat$date > (date1[length(date1)] + lubridate::hours(12)))) {
+    ind<- which(dat$date > (date1[length(date1)] + lubridate::hours(12)))
+    dat[ind, "period"]<- max(dat$period, na.rm = T) + 1
+  }
+  
   if (any(diff(unique(dat$period)) > 1)) {  #if not consecutive, make it so
     dat$period<- as.numeric(factor(dat$period))
   }
-    
+  
   
   dat
 }

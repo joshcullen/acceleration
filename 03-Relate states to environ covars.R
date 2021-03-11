@@ -428,6 +428,74 @@ ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
 
 
 
+
+## Reclassify 'Time of Night' per activity period
+# 1 = 1st hour
+# 2 = last hour
+# 3 = everything in between
+
+dat2$hour<- hour(dat2$date)
+
+foo<- dat2 %>% 
+  bayesmove::df_to_list("id") %>% 
+  map(nocturnal_period)
+
+
+for (i in 1:length(foo)) {
+  tmp<- foo[[i]]
+  TON<- rep(NA, nrow(tmp))
+  
+  for (j in 1:n_distinct(tmp$period)) {
+    ind<- which(tmp$period == j)
+    tmp1<- tmp[ind,]
+    
+    hrs<- unique(tmp1$hour)
+    TON[ind]<- ifelse(tmp1$hour == hrs[1], 1,
+                      ifelse(tmp1$hour == hrs[length(hrs)], 2, 3))
+    
+  }
+  
+  foo[[i]]$TON<- TON
+}
+
+foo2<- bind_rows(foo)
+
+
+df.TON2<- foo2 %>% 
+  filter(z.post.thresh != "Unclassified") %>% 
+  mutate_at('TON', factor, levels = c(1,3,2)) %>% 
+  mutate_at('z.post.thresh', droplevels) %>% 
+  group_by(TON, z.post.thresh, .drop = F) %>% 
+  tally() %>% 
+  mutate(freq = n / sum(n))
+
+ggplot(data = df.TON2, aes(TON, n, fill = z.post.thresh)) +
+  geom_bar(stat = "identity",
+           color = "black") +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey")) +
+  theme_bw() +
+  labs(x = "Relative Time of Night", y = "Number of Observations") +
+  scale_x_discrete(labels = c("Start", "Mid", "Late")) +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        legend.text = element_text(size = 10))
+
+
+ggplot(data = df.TON2, aes(TON, freq, fill = z.post.thresh)) +
+  geom_bar(stat = "identity",
+           color = "black") +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey")) +
+  theme_bw() +
+  labs(x = "Relative Time of Night", y = "Proportion of Observations") +
+  scale_x_discrete(labels = c("Start", "Mid", "Late")) +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        strip.text = element_text(size = 12, face = "bold")) +
+  facet_wrap(~ z.post.thresh)
+
+
+
 ## Proportion of LULC by behavioral state
 
 #filter for only "pure" land class (100% w/in 30 m buffer)
