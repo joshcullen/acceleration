@@ -887,11 +887,65 @@ ggplot(data = dat2 %>% filter(z.post.thresh != "Unclassified"), aes(green,wet)) 
 ###############################################
 
 # Define nocturnal activity periods; if not already converted, substract 4 hours from UTC time
-dat2$date<- dat2$date - hours(4)
-dat2<- nocturnal_period(dat2)
+dat2<- dat2 %>% 
+  bayesmove::df_to_list("id") %>% 
+  map(nocturnal_period) %>% 
+  bind_rows()
 
-#NEED TO FIX NOCTURNAL_PERIOD()
+# Calculate daily distance traveled by ID
+daily.dist<- dat2 %>% 
+  group_by(id, period) %>% 
+  summarize(dist = sum(sl2), month = unique(month))
 
+
+# Calculate daily max displacement from initial location
+daily.displ<- dat2 %>% 
+  bayesmove::df_to_list("id") %>% 
+  map(bayesmove::df_to_list, "period")
+
+for (i in 1:length(daily.displ)) {
+  
+  tmp<- daily.displ[[i]]
+  n.period<- length(tmp)
+  
+  for (j in 1:n.period) {
+    
+    boop<- tmp[[j]]
+    boop$displ<- sqrt((boop$x - boop$x[1])^2 + (boop$y - boop$y[1])^2)
+    
+    tmp[[j]]<- boop
+  }
+  
+  daily.displ[[i]]<- tmp
+}
+  
+daily.displ2<- flatten(daily.displ) %>% 
+  bind_rows() %>% 
+  mutate_at("period", as.numeric)
+
+daily.displ3<- daily.displ2 %>% 
+  group_by(id, period) %>% 
+  summarize(displ = max(displ, na.rm = T), month = unique(month))
+
+
+
+## Plot monthly trends by ID
+
+#distance
+ggplot(daily.dist, aes(month, dist, fill = id)) +
+  # geom_point(size = 2, alpha = 0.5) +
+  geom_boxplot() +
+  labs(y="Total distance traveled per day (m)", x = "Month") +
+  theme_bw() +
+  facet_wrap(~id)
+
+#max displacement
+ggplot(daily.displ3[-332,], aes(month, displ, fill = id)) +
+  # geom_point(size = 2, alpha = 0.5) +
+  geom_boxplot() +
+  labs(y="Max displacement per day (m)", x = "Month") +
+  theme_bw() +
+  facet_wrap(~id)
 
 ############################################################
 ### Extract Values of Continuous Variables by LULC Class ###
