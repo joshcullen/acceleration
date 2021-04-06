@@ -73,7 +73,7 @@ for (i in 1:length(unique(dat$id))) {
   
   tmp.dat<- dat %>% 
     filter(id == id1[i])
-  tmp.burrow<- burrow.locs %>% 
+  tmp.burrow<- burrow.locs2 %>% 
     filter(id == id1[i])
   for (j in 1:nrow(tmp.burrow)) {
     
@@ -127,3 +127,30 @@ ggplot(data = dat.filt3) +
   xlim(0,3000) +
   facet_wrap(~Label, scales = "free_y")
 
+
+
+# Plot distributions of SL and TA w/in 100 m of burrow
+dat.distrib<- dat.filt3 %>% 
+  filter(dist2burr <= 100) %>% 
+  dplyr::select(c(id, act.cat:ta.cat)) %>% 
+  pivot_longer(cols = -id, names_to = "var", values_to = "bin")
+
+var.labs <- c(
+  act.cat = "Activity Count",
+  sl.cat = "Step Length",
+  ta.cat = "Turning Angle"
+)
+
+ggplot(dat.distrib) +
+  geom_bar(aes(x = bin, y = ..prop.., fill = var, group = var), stat = 'count', color = "black") +
+  labs(x = "\nBin", y = "Proportion\n") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text.y = element_text(size = 14),
+        axis.text.x.bottom = element_text(size = 12),
+        strip.text = element_text(size = 14),
+        strip.text.x = element_text(face = "bold")) +
+  scale_fill_viridis_d("", guide = F) +
+  scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
+  scale_x_continuous(breaks = 1:10) +
+  facet_wrap(~ var, scales = "free_x", labeller = labeller(var = var.labs))
