@@ -43,6 +43,14 @@ post.seq=(nburn + 1):ngibbs
 plot(dat.res$loglikel, type = "l")
 plot(dat.res$loglikel[post.seq], type = "l")
 
+plot(dat.res$gamma1, type = "l")
+plot(dat.res$gamma1[post.seq], type = "l")
+
+par(mfrow=c(2,2), ask = T)
+for (i in 1:nmaxclust) {
+  plot(dat.res$theta[,i], type = "l", main = paste("State", i))
+}
+par(mfrow = c(1,1), ask=F)
 
 
 ## Inspect and Plot results
@@ -66,6 +74,7 @@ for (i in sample(post.seq, 4)) {
   plot(matrix(dat.res$phi[[2]][i,], nrow = nmaxclust)[4,], type = "h")
   plot(matrix(dat.res$phi[[3]][i,], nrow = nmaxclust)[4,], type = "h")
 }
+par(mfrow=c(1,1))
 ## Checks out, no state flipping when plotting random samples from posterior
 
 
@@ -77,10 +86,13 @@ behav.res<- get_behav_hist(dat = dat.res, nburn = nburn, ngibbs = ngibbs, nmaxcl
 # behav.res<- get_behav_hist(dat = dat.res, nburn = nburn, ngibbs = ngibbs, nmaxclust = nmaxclust,
 #                            var.names = c("Speed","Turning Angle"))
 
-behav.res$behav<- factor(behav.res$behav, levels = 1:nmaxclust)
+behav.res2<- behav.res %>% 
+  filter(behav %in% 1:max.gr) %>% 
+  mutate_at("behav", factor, levels = c(3,1,2,4))
+levels(behav.res2$behav)<- c("Slow-Turn", "Slow-Unif", "Exploratory", "Transit")
 
 # Plot state-dependent distributions 
-ggplot(behav.res %>% filter(behav %in% 1:max.gr), aes(x = bin, y = prop, fill = behav)) +
+ggplot(behav.res2, aes(x = bin, y = prop, fill = behav)) +
   geom_bar(stat = 'identity', color = "black") +
   labs(x = "\nBin", y = "Proportion\n") +
   theme_bw() +
@@ -89,12 +101,12 @@ ggplot(behav.res %>% filter(behav %in% 1:max.gr), aes(x = bin, y = prop, fill = 
         axis.text.x.bottom = element_text(size = 12),
         strip.text = element_text(size = 14),
         strip.text.x = element_text(face = "bold")) +
-  scale_fill_manual(values = c(viridis::viridis(4, option = 'inferno'), rep("grey35", 6)),
-                    guide = FALSE) +
+  scale_fill_viridis_d(option = 'inferno', guide = FALSE) +
   scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
   scale_x_continuous(breaks = 1:10) +
   facet_grid(behav ~ var, scales = "free_x")
 
+ggsave("Giant Arm distribs.png", width = 7, height = 6, units = "in", dpi = 330)
 
 
 
@@ -131,14 +143,17 @@ dat2<- dat %>%
   mutate(across(c('z.map','z.post.thresh','z.post.max'),
                 factor, levels = c('Slow-Turn','Slow-Unif','Exploratory','Transit',
                                    'Unclassified')
-                ))
+                )) %>% 
+  mutate_at("id", str_to_title)
 
 
 #by ID
 ggplot(dat2, aes(easting, northing, color = id)) +
   geom_path(aes(group = id), color = "grey80", size = 0.5) +
-  geom_point(size = 1) +
-  theme_bw()
+  geom_point(size = 1, alpha = 0.3) +
+  theme_bw() +
+  # theme(aspect.ratio = 1) +
+  facet_grid(~id, scales = "free", space = "free")
 
 #by z.map
 ggplot(dat2, aes(easting, northing, color = z.map)) +
@@ -148,11 +163,41 @@ ggplot(dat2, aes(easting, northing, color = z.map)) +
   theme_bw()
 
 #by z.post.thresh
-ggplot(dat2, aes(easting, northing, color = z.post.thresh)) +
-  scale_color_manual("", values = c(viridis::viridis(4), "grey")) +
+ggplot(dat2, aes(easting, northing, fill = z.post.thresh)) +
+  scale_fill_manual("State", values = c(viridis::viridis(4, option = "inferno"), "grey")) +
   geom_path(aes(group = id), color = "grey80", size = 0.5) +
-  geom_point(size = 1) +
-  theme_bw()
+  geom_point(size = 1, shape = 21) +
+  theme_bw() +
+  labs(x = "Easting", y = "Northing") +
+  facet_wrap(~id, scales = "free") +
+  theme(aspect.ratio = 1,
+        axis.title = element_text(size = 16),
+        axis.text = element_text(size = 10),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10)) +
+  guides(fill = guide_legend(override.aes = list(size = 2.5)))
+
+ggsave("Giant Arm facet behav map.png", width = 9, height = 8, units = "in", dpi = 330)
+
+
+ggplot(dat2 %>% filter(id == "Mafalda"), aes(easting, northing, fill = z.post.thresh)) +
+  scale_fill_manual("State", values = c(viridis::viridis(4, option = "inferno"), "grey")) +
+  geom_path(aes(group = id), color = "grey80", size = 0.5) +
+  geom_point(size = 2, shape = 21) +
+  theme_bw() +
+  labs(x = "Easting", y = "Northing") +
+  facet_wrap(~id, scales = "free") +
+  theme(aspect.ratio = 1,
+        axis.title = element_text(size = 16),
+        axis.text = element_text(size = 10),
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10)) +
+  guides(fill = guide_legend(override.aes = list(size = 2.5)))
+
+# ggsave("Giant Arm facet behav map.png", width = 9, height = 8, units = "in", dpi = 330)
+
 
 #by z.post.max
 ggplot(dat2, aes(easting, northing, color = z.post.max)) +

@@ -7,6 +7,8 @@ library(viridis)
 library(ks)
 library(cowplot)
 library(mgcv)
+library(gratia)
+library(wesanderson)
 
 source('helper functions.R')
 
@@ -28,8 +30,20 @@ dat$season<- ifelse(dat$month %in% c(month.abb[3:5]), "Fall",
                     ifelse(dat$month %in% c(month.abb[6:8]), "Winter",
                            ifelse(dat$month %in% c(month.abb[9:11]), "Spring", "Summer")))
 dat$season<- factor(dat$season, levels = c("Fall","Winter","Spring","Summer"))
-dat$season2<- ifelse(dat$month %in% month.abb[c(10:12,1:3)], "Rainy", "Dry")
+dat$season2<- ifelse(dat$month %in% month.abb[c(10:12,1:3)], "Wet", "Dry")
 
+
+#Plot of all tracks together
+pal2<- c(wes_palettes$Darjeeling1, wes_palettes$Darjeeling2[2:1])  #palette
+dat$id<- str_to_title(dat$id)
+
+ggplot(dat, aes(x, y, color = id)) +
+  geom_path(aes(group = id, color = id), size = 0.5) +
+  scale_color_manual("", values = pal2) +
+  labs(x = "Easting", y = "Northing") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 14)) +
+  coord_equal()
 
 
 ### Extract all available environ covars and check for correlations before deciding which to include
@@ -367,7 +381,7 @@ ggplot(df.ID, aes(z.post.thresh, freq, fill = z.post.thresh)) +
 ## Proportion of behavior by season
 
 df.season<- dat2 %>% 
-  group_by(season, z.post.thresh) %>% 
+  group_by(season2, z.post.thresh) %>% 
   summarize(n = n()) %>% 
   mutate(freq = n / sum(n))
 
@@ -377,7 +391,7 @@ ggplot(df.season, aes(z.post.thresh, freq, fill = z.post.thresh)) +
                     guide = guide_legend(reverse = TRUE)) +
   theme_bw() +
   labs(x = "", y = "Proportion of Observations") +
-  facet_wrap(~ season) +
+  facet_wrap(~ season2) +
   coord_flip() +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
@@ -400,7 +414,7 @@ df.TON<- dat2 %>%
 
 ggplot(data = df.TON, aes(hour1, n, fill = z.post.thresh)) +
   annotation_raster(alpha("grey30", .5),
-                    xmin = 7, xmax = 19,
+                    xmin = 6, xmax = 19,
                     ymin = -Inf, ymax = Inf) +
   geom_bar(stat = "identity",
            color = "black") +
@@ -409,15 +423,19 @@ ggplot(data = df.TON, aes(hour1, n, fill = z.post.thresh)) +
   labs(x = "Hour", y = "Number of Observations") +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
-        legend.text = element_text(size = 10))
+        legend.text = element_text(size = 10),
+        legend.position = "top")
+
+ggsave("Giant Arm Diel Activity Pattern.png", width = 7, height = 5, dpi = 330)
+
 
 ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
   annotation_raster(alpha("grey30", .5),
-                    xmin = 7, xmax = 19,
+                    xmin = 6, xmax = 19,
                     ymin = -Inf, ymax = Inf) +
   geom_bar(stat = "identity",
            color = "black") +
-  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey")) +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"), guide = F) +
   theme_bw() +
   labs(x = "Hour", y = "Proportion of Observations") +
   theme(axis.title = element_text(size = 16),
@@ -426,6 +444,7 @@ ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
         strip.text = element_text(size = 12, face = "bold")) +
   facet_wrap(~ z.post.thresh)
 
+ggsave("Giant Arm Diel Activity Pattern facet.png", width = 9, height = 5, dpi = 330)
 
 
 
@@ -598,7 +617,7 @@ plot(dat2$z.post.thresh, dat2$wet)
 #remove observations w/ "Unclassified" state (based on z.post.thresh)
 dat3<- dat2 %>% 
   filter(z.post.thresh != "Unclassified") %>% 
-  mutate(across(.cols = c(Forest:ndvi), scale)) %>% 
+  mutate(across(.cols = c(Forest:Floodable), scale)) %>%
   mutate(across(c(id,season2), factor))
 
 
@@ -614,7 +633,16 @@ st.su.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, b
                   s(id, bs = "re"),
                 data = dat.st.su, family = binomial, method = "REML")
 summary(st.su.mod)
-plot(st.su.mod, pages = 1, shade = T, seWithMean = T)
+
+
+#define covariates in vector for axis labels
+lulc<- c("Forest", "Closed Savanna", "Open Savanna", "Floodable")
+par(mfrow = c(2,2))
+for (i in 1:4) {
+  plot(st.su.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
+       xlab = lulc[i], ylab = "Probability of Slow-Unif", cex.axis = 1, cex.lab = 1)
+  abline(h = 0.5, lty = 2)
+}
 
 # Slow-Unif as ref
 ## odds ratios and 95% CI
@@ -655,7 +683,12 @@ st.exp.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, 
                   s(id, bs = "re"),
                 data = dat.st.exp, family = binomial, method = "REML")
 summary(st.exp.mod)
-plot(st.exp.mod, pages = 1, shade = T, seWithMean = T)
+
+for (i in 1:4) {
+  plot(st.exp.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
+       xlab = lulc[i], ylab = "Probability of Exploratory", cex.axis = 1, cex.lab = 1)
+  abline(h = 0.5, lty = 2)
+}
 
 # Exploratory as ref
 ## odds ratios and 95% CI
@@ -695,7 +728,12 @@ st.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs
                    s(id, bs = "re"),
                  data = dat.st.t, family = binomial, method = "REML")
 summary(st.t.mod)
-plot(st.t.mod, pages = 1, shade = T, seWithMean = T)
+
+for (i in 1:4) {
+  plot(st.t.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
+       xlab = lulc[i], ylab = "Probability of Transit", cex.axis = 1, cex.lab = 1)
+  abline(h = 0.5, lty = 2)
+}
 
 # Transit as ref
 ## odds ratios and 95% CI
@@ -735,7 +773,12 @@ su.exp.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, 
                    s(id, bs = "re"),
                  data = dat.su.exp, family = binomial, method = "REML")
 summary(su.exp.mod)
-plot(su.exp.mod, pages = 1, shade = T, seWithMean = T)
+
+for (i in 1:4) {
+  plot(su.exp.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
+       xlab = lulc[i], ylab = "Probability of Exploratory", cex.axis = 1, cex.lab = 1)
+  abline(h = 0.5, lty = 2)
+}
 
 # Exploratory as ref
 ## odds ratios and 95% CI
@@ -776,7 +819,12 @@ su.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs
                    s(id, bs = "re"),
                  data = dat.su.t, family = binomial, method = "REML")
 summary(su.t.mod)
-plot(su.t.mod, pages = 1, shade = T, seWithMean = T)
+
+for (i in 1:4) {
+  plot(su.t.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
+       xlab = lulc[i], ylab = "Probability of Transit", cex.axis = 1, cex.lab = 1)
+  abline(h = 0.5, lty = 2)
+}
 
 # Transit as ref
 ## odds ratios and 95% CI
@@ -817,7 +865,12 @@ exp.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, b
                    s(id, bs = "re"),
                  data = dat.exp.t, family = binomial, method = "REML")
 summary(exp.t.mod)
-plot(exp.t.mod, pages = 1, shade = T, seWithMean = T)
+
+for (i in 1:4) {
+  plot(exp.t.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
+       xlab = lulc[i], ylab = "Probability of Transit", cex.axis = 1, cex.lab = 1)
+  abline(h = 0.5, lty = 2)
+}
 
 # Transit as ref
 ## odds ratios and 95% CI
@@ -853,6 +906,30 @@ plot_grid(p.st.su, p.st.exp, p.st.t,
           p.su.exp, p.su.t, p.exp.t,
           nrow = 2)
 
+
+
+
+### Behavioral valuation of landscape
+dry.lulc.df2<- dry.lulc.df
+dry.lulc.df2$lulc<- ifelse(dry.lulc.df2$lulc == 3, 2, dry.lulc.df2$lulc)
+  
+pal1<- viridis(4, option = "inferno")
+
+ggplot() +
+  geom_raster(data = dry.lulc.df2, aes(x, y, fill = factor(lulc))) +
+  scale_fill_manual("", values = c(pal1[1], "grey85", pal1[4]),
+                    na.value = "transparent",
+                    labels = c("Slow-Turn", "Mixed", "Transit","")) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "right",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
 
 
 
