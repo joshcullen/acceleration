@@ -9,6 +9,10 @@ library(cowplot)
 library(mgcv)
 library(gratia)
 library(wesanderson)
+library(rnaturalearth)
+library(rnaturalearthhires)
+library(cowplot)
+library(sf)
 
 source('helper functions.R')
 
@@ -37,13 +41,51 @@ dat$season2<- ifelse(dat$month %in% month.abb[c(10:12,1:3)], "Wet", "Dry")
 pal2<- c(wes_palettes$Darjeeling1, wes_palettes$Darjeeling2[2:1])  #palette
 dat$id<- str_to_title(dat$id)
 
-ggplot(dat, aes(x, y, color = id)) +
+main.map<- ggplot(dat, aes(x, y, color = id)) +
   geom_path(aes(group = id, color = id), size = 0.5) +
   scale_color_manual("", values = pal2) +
   labs(x = "Easting", y = "Northing") +
+  xlim(617000, max(dat$x)) +
+  ylim(min(dat$y), 7887000) +
   theme_bw() +
-  theme(axis.title = element_text(size = 14)) +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 8),
+        panel.grid = element_blank()) +
   coord_equal()
+
+#access global map layer for inset
+SA<- ne_countries(scale = 'medium', continent = 'south america')
+SA.tr<- spTransform(SA, CRS("+init=epsg:32721"))
+# SA.df<- fortify(SA.tr)
+SA.sf<- st_as_sf(SA.tr)
+
+inset1<- ggplot() +
+  geom_sf(data = SA.sf, fill = "grey40", color = "white", size = 0.25) +
+  geom_rect(aes(xmin = min(dat$x) - 3e5,
+                xmax = max(dat$x) + 3e5,
+                ymin = min(dat$y) - 3e5,
+                ymax = max(dat$y) + 3e5),
+            color = "red", fill = NA, size = 0.5) +
+  scale_x_continuous(expand = c(0,0), limits = c(-2.5e6, st_bbox(SA.sf)$xmax)) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_void()
+
+inset2<- ggplot() +
+  geom_sf(data = SA.sf, fill = "grey40", color = "white", size = 0.25) +
+  geom_rect(aes(xmin = min(dat$x),
+                xmax = max(dat$x),
+                ymin = min(dat$y),
+                ymax = max(dat$y)),
+            color = "yellow", fill = NA, size = 0.5) +
+  scale_x_continuous(expand = c(0,0), limits = c(min(dat$x) - 3e5, max(dat$x) + 3e5)) +
+  scale_y_continuous(expand = c(0,0), limits = c(min(dat$y) - 3e5, max(dat$y) + 3e5)) +
+  theme_void()
+
+ggdraw(main.map) + 
+  draw_plot(inset1, x = 0.15, y = 0.6, width = 0.15, height = 0.3) +
+  draw_plot(inset2, x = 0.3, y = 0.68, width = 0.17, height = 0.17)
+
+ggsave("Figure 1.png", width = 6, height = 4, units = "in", dpi = 330)
 
 
 ### Extract all available environ covars and check for correlations before deciding which to include
@@ -1023,6 +1065,14 @@ ggplot(daily.displ3[-332,], aes(month, displ, fill = id)) +
   labs(y="Max displacement per day (m)", x = "Month") +
   theme_bw() +
   facet_wrap(~id)
+
+
+## Summarize daily max displacement (mean and range)
+daily.displ3<- daily.displ3 %>% 
+  filter(displ < 10000)  #remove weird high value from mazeboti
+daily.displ3 %>% 
+  group_by(id) %>% 
+  summarize(mean = mean(displ), lo = min(displ), hi = max(displ))
 
 ############################################################
 ### Extract Values of Continuous Variables by LULC Class ###
