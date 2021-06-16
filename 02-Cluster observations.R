@@ -13,7 +13,6 @@ dat$date<- as_datetime(dat$date, tz = "Etc/GMT+4")  #change timezone to subtract
 
 
 dat2<- subset(dat, select = c(sl.cat, ta.cat, act.cat))
-# dat3<- subset(dat, select = c(sl.cat, ta.cat))  #check states for only SL and TA
 
 ## Map available points for each ID
 ggplot(dat, aes(easting, northing, color = id)) +
@@ -83,30 +82,56 @@ par(mfrow=c(1,1))
 # Extract bin estimates for each possible state from the `phi` matrix of the model results
 behav.res<- get_behav_hist(dat = dat.res, nburn = nburn, ngibbs = ngibbs, nmaxclust = nmaxclust,
                            var.names = c("Speed","Turning Angle","Activity Counts"))
-# behav.res<- get_behav_hist(dat = dat.res, nburn = nburn, ngibbs = ngibbs, nmaxclust = nmaxclust,
-#                            var.names = c("Speed","Turning Angle"))
 
 behav.res2<- behav.res %>% 
   filter(behav %in% 1:max.gr) %>% 
   mutate_at("behav", factor, levels = c(3,1,2,4))
-levels(behav.res2$behav)<- c("Slow-Turn", "Slow-Unif", "Exploratory", "Transit")
+levels(behav.res2$behav)<- c("VE", "Local Search", "Exploratory", "Transit")
+
+# Rename bin labels on continuous scale
+act.lims<- data.frame(brk = seq(from = 0, to = 300, by = 50),
+                      var = 'Activity Counts')
+sl.lims<- data.frame(brk = round(c(seq(from = 0, to = 60, by = 10), max(dat$sl2)) / 60, 2),
+                     var = 'Speed')  #convert to m/s
+ta.lims<- data.frame(brk = round(seq(from = -pi, to = pi, length.out = 11), 2),
+                    var = 'Turning Angle')
+lims<- rbind(act.lims, sl.lims, ta.lims)
+
+new.lab<- data.frame()
+for (i in 1:length(unique(behav.res2$var))) {
+  ind<- unique(behav.res2$var)[i]
+  tmp<- lims %>% 
+    filter(var == ind)
+  
+  for (j in 2:nrow(tmp)) {
+    new.lab<- rbind(new.lab, 
+                    c(paste0(tmp[j-1, 'brk'], ', ', tmp[j, 'brk']),
+                      unique(tmp$var),
+                      j-1))
+  }
+}
+names(new.lab)<- c('labs', 'var', 'bin')
+new.lab$bin<- as.integer(new.lab$bin)
+behav.res3<- left_join(behav.res2, new.lab, by = c('var', 'bin'))
+behav.res3$labs<- factor(behav.res3$labs, levels = unique(behav.res3$labs))
 
 # Plot state-dependent distributions 
-ggplot(behav.res2, aes(x = bin, y = prop, fill = behav)) +
-  geom_bar(stat = 'identity', color = "black") +
+ggplot(behav.res3, aes(x = labs, y = prop, fill = behav)) +
+  geom_col(color = "black") +
   labs(x = "\nBin", y = "Proportion\n") +
   theme_bw() +
   theme(axis.title = element_text(size = 16),
         axis.text.y = element_text(size = 14),
-        axis.text.x.bottom = element_text(size = 12),
+        axis.text.x.bottom = element_text(size = 12, angle = 90, vjust = 0.5, hjust=1),
         strip.text = element_text(size = 14),
-        strip.text.x = element_text(face = "bold")) +
+        strip.text.x = element_text(face = "bold"),
+        strip.background = element_blank(),
+        panel.grid = element_blank()) +
   scale_fill_viridis_d(option = 'inferno', guide = FALSE) +
   scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
-  scale_x_continuous(breaks = 1:10) +
   facet_grid(behav ~ var, scales = "free_x")
 
-ggsave("Giant Arm distribs.png", width = 7, height = 6, units = "in", dpi = 330)
+# ggsave("Figure 3.png", width = 7, height = 7, units = "in", dpi = 330)
 
 
 
@@ -169,7 +194,7 @@ ggplot(dat2, aes(easting, northing, fill = z.post.thresh)) +
   geom_point(size = 1, shape = 21) +
   theme_bw() +
   labs(x = "Easting", y = "Northing") +
-  facet_wrap(~id, scales = "free") +
+  # facet_wrap(~id, scales = "free") +
   theme(aspect.ratio = 1,
         axis.title = element_text(size = 16),
         axis.text = element_text(size = 10),
@@ -178,7 +203,7 @@ ggplot(dat2, aes(easting, northing, fill = z.post.thresh)) +
         legend.text = element_text(size = 10)) +
   guides(fill = guide_legend(override.aes = list(size = 2.5)))
 
-ggsave("Giant Arm facet behav map.png", width = 9, height = 8, units = "in", dpi = 330)
+# ggsave("Giant Arm facet behav map.png", width = 9, height = 8, units = "in", dpi = 330)
 
 
 ggplot(dat2 %>% filter(id == "Mafalda"), aes(easting, northing, fill = z.post.thresh)) +
@@ -236,3 +261,93 @@ behav.res<- behav.res %>%
 
 # write.csv(dat2, "Giant Armadillo state estimates.csv",row.names=F)
 # write.csv(behav.res, "Giant Armadillo behavior distribs.csv", row.names=F)
+
+
+
+###------------------------------------------
+
+## Run model w/ only SL and TA for comparison
+
+dat3<- subset(dat, select = c(sl.cat, ta.cat))  #check states for only SL and TA
+
+# Run model
+set.seed(3)
+
+# Define model params
+alpha=0.1  #prior
+ngibbs=20000  #number of Gibbs sampler iterations
+nburn=ngibbs/2  #number of burn-in iterations
+nmaxclust=10  #number of maximum possible states (clusters) present
+
+# Run model
+dat.res2<- cluster_obs(dat=dat3, alpha=alpha, ngibbs=ngibbs, nmaxclust=nmaxclust,
+                      nburn=nburn)
+# takes 15 min to run 20,000 iterations
+
+# Inspect traceplot of log-likelihood
+post.seq=(nburn + 1):ngibbs
+plot(dat.res2$loglikel, type = "l")
+plot(dat.res2$loglikel[post.seq], type = "l")
+
+
+## Inspect and Plot results
+theta<- dat.res2$theta[post.seq,]
+colnames(theta)<- 1:ncol(theta)
+theta1<- colMeans(theta)
+theta1<- sort(theta1, decreasing = TRUE)
+cumsum(theta1)  #3 states optimal
+
+max.gr=3
+
+## Viz state-dependent distributions
+# Extract bin estimates for each possible state from the `phi` matrix of the model results
+behav.res<- get_behav_hist(dat = dat.res2, nburn = nburn, ngibbs = ngibbs, nmaxclust = nmaxclust,
+                           var.names = c("Speed","Turning Angle"))
+
+behav.res2<- behav.res %>% 
+  filter(behav %in% 1:max.gr) %>% 
+  mutate_at("behav", factor, levels = c(2,1,3))
+levels(behav.res2$behav)<- c("VE", "Local Search", "Exploratory")
+
+# Rename bin labels on continuous scale
+sl.lims<- data.frame(brk = round(c(seq(from = 0, to = 60, by = 10), max(dat$sl2)) / 60, 2),
+                     var = 'Speed')  #convert to m/s
+ta.lims<- data.frame(brk = round(seq(from = -pi, to = pi, length.out = 11), 2),
+                     var = 'Turning Angle')
+lims<- rbind(sl.lims, ta.lims)
+
+new.lab<- data.frame()
+for (i in 1:length(unique(behav.res2$var))) {
+  ind<- unique(behav.res2$var)[i]
+  tmp<- lims %>% 
+    filter(var == ind)
+  
+  for (j in 2:nrow(tmp)) {
+    new.lab<- rbind(new.lab, 
+                    c(paste0(tmp[j-1, 'brk'], ', ', tmp[j, 'brk']),
+                      unique(tmp$var),
+                      j-1))
+  }
+}
+names(new.lab)<- c('labs', 'var', 'bin')
+new.lab$bin<- as.integer(new.lab$bin)
+behav.res3<- left_join(behav.res2, new.lab, by = c('var', 'bin'))
+behav.res3$labs<- factor(behav.res3$labs, levels = unique(behav.res3$labs))
+
+# Plot state-dependent distributions 
+ggplot(behav.res3, aes(x = labs, y = prop, fill = behav)) +
+  geom_col(color = "black") +
+  labs(x = "\nBin", y = "Proportion\n") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 16),
+        axis.text.y = element_text(size = 14),
+        axis.text.x.bottom = element_text(size = 12, angle = 90, vjust = 0.5, hjust=1),
+        strip.text = element_text(size = 14),
+        strip.text.x = element_text(face = "bold"),
+        strip.background = element_blank(),
+        panel.grid = element_blank()) +
+  scale_fill_viridis_d(option = 'inferno', guide = FALSE) +
+  scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
+  facet_grid(behav ~ var, scales = "free_x")
+
+# ggsave("Figure S1.png", width = 7, height = 7, units = "in", dpi = 330)
