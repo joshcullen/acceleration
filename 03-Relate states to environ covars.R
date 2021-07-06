@@ -535,19 +535,18 @@ flood.breaks <- scale(gam.labels, att.flood[2], att.flood[3])[,1]
 
 
 
-## Compare Slow-Turn vs Slow-Unif (Closed Savanna and blanca are reference classes)
-dat.st.su<- dat3 %>% 
-  filter(z.post.thresh == "VE" | z.post.thresh == "Local Search")
-dat.st.su$state<- ifelse(dat.st.su$z.post.thresh == "VE", 0, 1)
-table(dat.st.su$id, dat.st.su$state)  #check n per combo
-st.su.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+## Compare VE vs all others
+dat.ve<- dat3
+dat.ve$state<- ifelse(dat.ve$z.post.thresh == "VE", 1, 0)
+table(dat.ve$id, dat.ve$state)  #check n per combo
+ve.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
                   s(id, bs = "re"),
-                data = dat.st.su, family = binomial, method = "REML")
-summary(st.su.mod)
+                data = dat.ve, family = binomial, method = "REML")
+summary(ve.mod)
 
 # prep data for plotting w/ mgcViz
-st.su.viz<- getViz(st.su.mod)
+ve.viz<- getViz(ve.mod)
 
 ## define theme for GAMM ggplots
 theme_gam <- function(){ 
@@ -576,43 +575,43 @@ theme_gam <- function(){
     )
 }
 
-p.st.su1<- plot( sm(st.su.viz, 1) , trans = plogis) + 
+p.ve1<- plot( sm(ve.viz, 1) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Local Search')), x = '') +
-  ylim(0.39, 0.62) +
+  labs(y = expression(paste(italic(Pr), ' VE')), x = '') +
+  ylim(0.35, 0.72) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
   theme_gam()
-p.st.su2<- plot( sm(st.su.viz, 2) , trans = plogis) + 
+p.ve2<- plot( sm(ve.viz, 2) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
   labs(y = '', x = '') +
-  ylim(0.39, 0.62) +
+  ylim(0.35, 0.72) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
   theme_gam()
-p.st.su3<- plot( sm(st.su.viz, 3) , trans = plogis) + 
+p.ve3<- plot( sm(ve.viz, 3) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
   labs(y = '', x = '') +
-  ylim(0.39, 0.62) +
+  ylim(0.35, 0.72) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
   theme_gam()
-p.st.su4<- plot( sm(st.su.viz, 4) , trans = plogis) + 
+p.ve4<- plot( sm(ve.viz, 4) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
   labs(y = '', x = '') +
-  ylim(0.39, 0.62) +
+  ylim(0.35, 0.72) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
   theme_gam()
@@ -631,57 +630,56 @@ p.st.su4<- plot( sm(st.su.viz, 4) , trans = plogis) +
 
 
 
-## Compare Slow-Turn vs Exploratory
-dat.st.exp<- dat3 %>% 
-  filter(z.post.thresh == "VE" | z.post.thresh == "Exploratory")
-dat.st.exp$state<- ifelse(dat.st.exp$z.post.thresh == "VE", 0, 1)
-table(dat.st.exp$id, dat.st.exp$state)  #check n per combo
-st.exp.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+## Compare Local Search vs all others
+dat.ls<- dat3
+dat.ls$state<- ifelse(dat.ls$z.post.thresh == "Local Search", 1, 0)
+table(dat.ls$id, dat.ls$state)  #check n per combo
+ls.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
                   s(id, bs = "re"),
-                data = dat.st.exp, family = binomial, method = "REML")
-summary(st.exp.mod)
+                data = dat.ls, family = binomial, method = "REML")
+summary(ls.mod)
 
 # prep data for plotting w/ mgcViz
-st.exp.viz<- getViz(st.exp.mod)
+ls.viz<- getViz(ls.mod)
 
-p.st.exp1<- plot( sm(st.exp.viz, 1) , trans = plogis) + 
+p.ls1<- plot( sm(ls.viz, 1) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Exploratory')), x = '') +
-  ylim(0.22, 0.73) +
+  labs(y = expression(paste(italic(Pr), ' Local Search')), x = '') +
+  ylim(0.4, 0.6) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
   theme_gam()
-p.st.exp2<- plot( sm(st.exp.viz, 2) , trans = plogis) + 
+p.ls2<- plot( sm(ls.viz, 2) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
   labs(y = '', x = '') +
-  ylim(0.22, 0.73) +
+  ylim(0.4, 0.6) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
   theme_gam()
-p.st.exp3<- plot( sm(st.exp.viz, 3) , trans = plogis) + 
+p.ls3<- plot( sm(ls.viz, 3) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
   labs(y = '', x = '') +
-  ylim(0.22, 0.73) +
+  ylim(0.4, 0.6) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
   theme_gam()
-p.st.exp4<- plot( sm(st.exp.viz, 4) , trans = plogis) + 
+p.ls4<- plot( sm(ls.viz, 4) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
   labs(y = '', x = '') +
-  ylim(0.22, 0.73) +
+  ylim(0.44, 0.56) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
   theme_gam()
@@ -695,57 +693,56 @@ p.st.exp4<- plot( sm(st.exp.viz, 4) , trans = plogis) +
 
 
 
-## Compare Slow-Turn vs Transit
-dat.st.t<- dat3 %>% 
-  filter(z.post.thresh == "VE" | z.post.thresh == "Transit")
-dat.st.t$state<- ifelse(dat.st.t$z.post.thresh == "VE", 0, 1)
-table(dat.st.t$id, dat.st.t$state)  #check n per combo
-st.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+## Compare Exploratory vs all others
+dat.exp<- dat3
+dat.exp$state<- ifelse(dat.exp$z.post.thresh == "Exploratory", 1, 0)
+table(dat.exp$id, dat.exp$state)  #check n per combo
+exp.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
                    s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
                    s(id, bs = "re"),
-                 data = dat.st.t, family = binomial, method = "REML")
-summary(st.t.mod)
+                 data = dat.exp, family = binomial, method = "REML")
+summary(exp.mod)
 
 # prep data for plotting w/ mgcViz
-st.t.viz<- getViz(st.t.mod)
+exp.viz<- getViz(exp.mod)
 
-p.st.t1<- plot( sm(st.t.viz, 1) , trans = plogis) + 
+p.exp1<- plot( sm(exp.viz, 1) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Transit')), x = 'Forest') +
-  ylim(0.3, 0.65) +
+  labs(y = expression(paste(italic(Pr), ' Exploratory')), x = '') +
+  ylim(0.3, 0.7) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
   theme_gam()
-p.st.t2<- plot( sm(st.t.viz, 2) , trans = plogis) + 
+p.exp2<- plot( sm(exp.viz, 2) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = '', x = 'Closed Savanna') +
-  ylim(0.3, 0.65) +
+  labs(y = '', x = '') +
+  ylim(0.3, 0.7) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
   theme_gam()
-p.st.t3<- plot( sm(st.t.viz, 3) , trans = plogis) + 
+p.exp3<- plot( sm(exp.viz, 3) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = '', x = 'Open Savanna') +
-  ylim(0.3, 0.65) +
+  labs(y = '', x = '') +
+  ylim(0.3, 0.7) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
   theme_gam()
-p.st.t4<- plot( sm(st.t.viz, 4) , trans = plogis) + 
+p.exp4<- plot( sm(exp.viz, 4) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = '', x = 'Floodable') +
-  ylim(0.3, 0.65) +
+  labs(y = '', x = '') +
+  ylim(0.3, 0.7) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
   theme_gam()
@@ -758,69 +755,57 @@ p.st.t4<- plot( sm(st.t.viz, 4) , trans = plogis) +
 # }
 
 
-## Create panel plot
-# png('Figure 5.png', width = 12, height = 8, units = "in", res = 330)
-gridPrint(p.st.su1, p.st.su2, p.st.su3, p.st.su4,
-          p.st.exp1, p.st.exp2, p.st.exp3, p.st.exp4,
-          p.st.t1, p.st.t2, p.st.t3, p.st.t4,
-          nrow = 3, ncol = 4)
-# dev.off()
 
-
-
-
-
-## Compare Slow-Unif vs Exploratory
-dat.su.exp<- dat3 %>% 
-  filter(z.post.thresh == "Local Search" | z.post.thresh == "Exploratory")
-dat.su.exp$state<- ifelse(dat.su.exp$z.post.thresh == "Local Search", 0, 1)
-table(dat.su.exp$id, dat.su.exp$state)  #check n per combo
-su.exp.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
+## Compare Transit vs all others
+dat.t<- dat3
+dat.t$state<- ifelse(dat.t$z.post.thresh == "Transit", 1, 0)
+table(dat.t$id, dat.t$state)  #check n per combo
+t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
                    s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
                    s(id, bs = "re"),
-                 data = dat.su.exp, family = binomial, method = "REML")
-summary(su.exp.mod)
+                 data = dat.t, family = binomial, method = "REML")
+summary(t.mod)
 
 # prep data for plotting w/ mgcViz
-su.exp.viz<- getViz(su.exp.mod)
+t.viz<- getViz(t.mod)
 
-p.su.exp1<- plot( sm(su.exp.viz, 1) , trans = plogis) + 
+p.t1<- plot( sm(t.viz, 1) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Exploratory')), x = '') +
-  ylim(0.3, 0.7) +
+  labs(y = expression(paste(italic(Pr), ' Transit')), x = 'Forest') +
+  ylim(0.4, 0.7) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
   theme_gam()
-p.su.exp2<- plot( sm(su.exp.viz, 2) , trans = plogis) + 
+p.t2<- plot( sm(t.viz, 2) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.3, 0.7) +
+  labs(y = '', x = 'Closed Savanna') +
+  ylim(0.4, 0.7) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
   theme_gam()
-p.su.exp3<- plot( sm(su.exp.viz, 3) , trans = plogis) + 
+p.t3<- plot( sm(t.viz, 3) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.3, 0.7) +
+  labs(y = '', x = 'Open Savanna') +
+  ylim(0.4, 0.7) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
   theme_gam()
-p.su.exp4<- plot( sm(su.exp.viz, 4) , trans = plogis) + 
+p.t4<- plot( sm(t.viz, 4) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
   l_ciPoly(level = 0.95, alpha = 0.5) + 
   l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.3, 0.7) +
+  labs(y = '', x = 'Floodable') +
+  ylim(0.4, 0.7) +
   # l_points(shape = 19, size = 1, alpha = 0.1) + 
   scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
   theme_gam()
@@ -834,146 +819,20 @@ p.su.exp4<- plot( sm(su.exp.viz, 4) , trans = plogis) +
 
 
 
-## Compare Slow-Unif vs Transit
-dat.su.t<- dat3 %>% 
-  filter(z.post.thresh == "Local Search" | z.post.thresh == "Transit")
-dat.su.t$state<- ifelse(dat.su.t$z.post.thresh == "Local Search", 0, 1)
-table(dat.su.t$id, dat.su.t$state)  #check n per combo
-su.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                   s(id, bs = "re"),
-                 data = dat.su.t, family = binomial, method = "REML")
-summary(su.t.mod)
-
-# prep data for plotting w/ mgcViz
-su.t.viz<- getViz(su.t.mod)
-
-p.su.t1<- plot( sm(su.t.viz, 1) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
-  l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Transit')), x = 'Forest') +
-  ylim(0.4, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
-  theme_gam()
-p.su.t2<- plot( sm(su.t.viz, 2) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Closed Savanna') +
-  ylim(0.4, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
-  theme_gam()
-p.su.t3<- plot( sm(su.t.viz, 3) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Open Savanna') +
-  ylim(0.4, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
-  theme_gam()
-p.su.t4<- plot( sm(su.t.viz, 4) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Floodable') +
-  ylim(0.4, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
-  theme_gam()
-
-# for (i in 1:4) {
-#   plot(su.t.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
-#        xlab = lulc[i], ylab = "Probability of Transit", cex.axis = 1, cex.lab = 1)
-#   abline(h = 0.5, lty = 2)
-# }
-
-
-
 ## Create panel plot
-# png('Figure 6.png', width = 12, height = 8, units = "in", res = 330)
-gridPrint(p.su.exp1, p.su.exp2, p.su.exp3, p.su.exp4,
-          p.su.t1, p.su.t2, p.su.t3, p.su.t4,
-          nrow = 2, ncol = 4)
+# png('Figure 5.png', width = 12, height = 8, units = "in", res = 330)
+gridPrint(p.ve1, p.ve2, p.ve3, p.ve4,
+          p.ls1, p.ls2, p.ls3, p.ls4,
+          p.exp1, p.exp2, p.exp3, p.exp4,
+          p.t1, p.t2, p.t3, p.t4,
+          nrow = 4, ncol = 4)
 # dev.off()
 
 
 
-## Compare Exploratory vs Transit
-dat.exp.t<- dat3 %>% 
-  filter(z.post.thresh == "Exploratory" | z.post.thresh == "Transit")
-dat.exp.t$state<- ifelse(dat.exp.t$z.post.thresh == "Exploratory", 0, 1)
-table(dat.exp.t$id, dat.exp.t$state)  #check n per combo
-exp.t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                   s(id, bs = "re"),
-                 data = dat.exp.t, family = binomial, method = "REML")
-summary(exp.t.mod)
-
-# prep data for plotting w/ mgcViz
-exp.t.viz<- getViz(exp.t.mod)
-
-p.exp.t1<- plot( sm(exp.t.viz, 1) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
-  l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Transit')), x = 'Forest') +
-  ylim(0.45, 0.65) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
-  theme_gam()
-p.exp.t2<- plot( sm(exp.t.viz, 2) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Closed Savanna') +
-  ylim(0.45, 0.65) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
-  theme_gam()
-p.exp.t3<- plot( sm(exp.t.viz, 3) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Open Savanna') +
-  ylim(0.45, 0.65) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
-  theme_gam()
-p.exp.t4<- plot( sm(exp.t.viz, 4) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Floodable') +
-  ylim(0.45, 0.65) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
-  theme_gam()
-
-# for (i in 1:4) {
-#   plot(exp.t.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
-#        xlab = lulc[i], ylab = "Probability of Transit", cex.axis = 1, cex.lab = 1)
-#   abline(h = 0.5, lty = 2)
-# }
 
 
 
-## Create panel plot
-# png('Figure 7.png', width = 12, height = 4, units = "in", res = 330)
-gridPrint(p.exp.t1, p.exp.t2, p.exp.t3, p.exp.t4,
-          nrow = 1, ncol = 4)
-# dev.off()
 
 
 
