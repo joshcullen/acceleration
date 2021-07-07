@@ -159,14 +159,14 @@ dat$z.post.max<- ifelse(dat$z.post.max > max.gr, NA, dat$z.post.max)
 # Attribute behaviors to states
 dat2<- dat %>% 
   mutate(across(c('z.map','z.post.thresh','z.post.max'),
-                ~case_when(. == 1 ~ "Slow-Unif",
+                ~case_when(. == 1 ~ "Local Search",
                            . == 2 ~ "Exploratory",
-                           . == 3 ~ "Slow-Turn",
+                           . == 3 ~ "VE",
                            . == 4 ~ "Transit",
                            is.na(.) ~ "Unclassified")
                 )) %>% 
   mutate(across(c('z.map','z.post.thresh','z.post.max'),
-                factor, levels = c('Slow-Turn','Slow-Unif','Exploratory','Transit',
+                factor, levels = c('VE','Local Search','Exploratory','Transit',
                                    'Unclassified')
                 )) %>% 
   mutate_at("id", str_to_title)
@@ -194,7 +194,7 @@ ggplot(dat2, aes(easting, northing, fill = z.post.thresh)) +
   geom_point(size = 1, shape = 21) +
   theme_bw() +
   labs(x = "Easting", y = "Northing") +
-  # facet_wrap(~id, scales = "free") +
+  facet_wrap(~id, scales = "free") +
   theme(aspect.ratio = 1,
         axis.title = element_text(size = 16),
         axis.text = element_text(size = 10),
@@ -221,7 +221,7 @@ ggplot(dat2 %>% filter(id == "Mafalda"), aes(easting, northing, fill = z.post.th
         legend.text = element_text(size = 10)) +
   guides(fill = guide_legend(override.aes = list(size = 2.5)))
 
-# ggsave("Giant Arm facet behav map.png", width = 9, height = 8, units = "in", dpi = 330)
+# ggsave("Giant Arm behav map_mafalda.png", width = 9, height = 8, units = "in", dpi = 330)
 
 
 #by z.post.max
@@ -252,9 +252,9 @@ dat2 %>%   # for MAP estimates
 behav.res<- behav.res %>% 
   filter(behav %in% 1:max.gr) %>% 
   mutate(across(c('behav'),
-                ~case_when(. == 1 ~ "Slow-Unif",
+                ~case_when(. == 1 ~ "Local Search",
                            . == 2 ~ "Exploratory",
-                           . == 3 ~ "Slow-Turn",
+                           . == 3 ~ "VE",
                            . == 4 ~ "Transit",
                            is.na(.) ~ "Unclassified")
   ))

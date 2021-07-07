@@ -23,9 +23,8 @@ dat<- read.csv("Giant Armadillo state estimates.csv", as.is = T)
 dat<-  dat %>% 
   rename(x = easting, y = northing) %>% 
   mutate(across(c('z.map','z.post.thresh','z.post.max'), factor,
-                levels = c("Slow-Turn","Slow-Unif","Exploratory","Transit","Unclassified"))
+                levels = c("VE","Local Search","Exploratory","Transit","Unclassified"))
   )
-levels(dat$z.post.thresh)[1:2]<- c('VE', 'Local Search')
 dat$date<- as_datetime(dat$date, tz = "UTC")
 dat$month<- month.abb[month(dat$date)]
 dat$month<- factor(dat$month, levels = month.abb[c(5:12,1)])
@@ -169,6 +168,27 @@ ggplot(data = dat, aes(x, y)) +
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12))
 
+# ggsave("Giant Arm behav_lulc.png", width = 7, height = 5, units = "in", dpi = 330)
+
+
+# Example plot of region subset
+ggplot() +
+  geom_raster(data = dry.lulc.df, aes(x, y, fill = factor(lulc))) +
+  scale_fill_manual("", values = c("darkgreen","burlywood4","darkolivegreen3","lightskyblue1"),
+                    na.value = "transparent",
+                    labels = c("Forest", "Closed Savanna", "Open Savanna", "Floodable","")) +
+  scale_x_continuous(expand = c(0,0), limits = c(626250,627200)) +
+  scale_y_continuous(expand = c(0,0), limits = c(7875000,7876000)) +
+  labs(x="Easting", y="Northing") +
+  theme_bw() +
+  coord_equal() +
+  theme(legend.position = "right",
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+
+# ggsave("Giant Arm lulc_subset.png", width = 6, height = 4, units = "in", dpi = 330)
 
 
 
