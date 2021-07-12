@@ -552,6 +552,7 @@ cs.breaks <- scale(gam.labels, att.cs[2], att.cs[3])[,1]
 os.breaks <- scale(gam.labels, att.os[2], att.os[3])[,1]
 flood.breaks <- scale(gam.labels, att.flood[2], att.flood[3])[,1]
 
+state.pal<- viridis(n=4, option = 'inferno')
 
 
 
@@ -598,7 +599,7 @@ theme_gam <- function(){
 p.ve1<- plot( sm(ve.viz, 1) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[1]) + 
   l_fitLine() + 
   labs(y = expression(paste(italic(Pr), ' VE')), x = '') +
   ylim(0.35, 0.72) +
@@ -608,7 +609,7 @@ p.ve1<- plot( sm(ve.viz, 1) , trans = plogis) +
 p.ve2<- plot( sm(ve.viz, 2) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[1]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.35, 0.72) +
@@ -618,7 +619,7 @@ p.ve2<- plot( sm(ve.viz, 2) , trans = plogis) +
 p.ve3<- plot( sm(ve.viz, 3) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[1]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.35, 0.72) +
@@ -628,7 +629,7 @@ p.ve3<- plot( sm(ve.viz, 3) , trans = plogis) +
 p.ve4<- plot( sm(ve.viz, 4) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[1]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.35, 0.72) +
@@ -666,7 +667,7 @@ ls.viz<- getViz(ls.mod)
 p.ls1<- plot( sm(ls.viz, 1) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[2]) + 
   l_fitLine() + 
   labs(y = expression(paste(italic(Pr), ' Local Search')), x = '') +
   ylim(0.4, 0.6) +
@@ -676,7 +677,7 @@ p.ls1<- plot( sm(ls.viz, 1) , trans = plogis) +
 p.ls2<- plot( sm(ls.viz, 2) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[2]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.4, 0.6) +
@@ -686,7 +687,7 @@ p.ls2<- plot( sm(ls.viz, 2) , trans = plogis) +
 p.ls3<- plot( sm(ls.viz, 3) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[2]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.4, 0.6) +
@@ -696,7 +697,7 @@ p.ls3<- plot( sm(ls.viz, 3) , trans = plogis) +
 p.ls4<- plot( sm(ls.viz, 4) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[2]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.44, 0.56) +
@@ -729,7 +730,7 @@ exp.viz<- getViz(exp.mod)
 p.exp1<- plot( sm(exp.viz, 1) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[3]) + 
   l_fitLine() + 
   labs(y = expression(paste(italic(Pr), ' Exploratory')), x = '') +
   ylim(0.3, 0.7) +
@@ -739,7 +740,7 @@ p.exp1<- plot( sm(exp.viz, 1) , trans = plogis) +
 p.exp2<- plot( sm(exp.viz, 2) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[3]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.3, 0.7) +
@@ -749,7 +750,7 @@ p.exp2<- plot( sm(exp.viz, 2) , trans = plogis) +
 p.exp3<- plot( sm(exp.viz, 3) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[3]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.3, 0.7) +
@@ -759,7 +760,7 @@ p.exp3<- plot( sm(exp.viz, 3) , trans = plogis) +
 p.exp4<- plot( sm(exp.viz, 4) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[3]) + 
   l_fitLine() + 
   labs(y = '', x = '') +
   ylim(0.3, 0.7) +
@@ -792,7 +793,7 @@ t.viz<- getViz(t.mod)
 p.t1<- plot( sm(t.viz, 1) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.75, fill = state.pal[4]) + 
   l_fitLine() + 
   labs(y = expression(paste(italic(Pr), ' Transit')), x = 'Forest') +
   ylim(0.4, 0.7) +
@@ -802,7 +803,7 @@ p.t1<- plot( sm(t.viz, 1) , trans = plogis) +
 p.t2<- plot( sm(t.viz, 2) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.75, fill = state.pal[4]) + 
   l_fitLine() + 
   labs(y = '', x = 'Closed Savanna') +
   ylim(0.4, 0.7) +
@@ -812,7 +813,7 @@ p.t2<- plot( sm(t.viz, 2) , trans = plogis) +
 p.t3<- plot( sm(t.viz, 3) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.75, fill = state.pal[4]) + 
   l_fitLine() + 
   labs(y = '', x = 'Open Savanna') +
   ylim(0.4, 0.7) +
@@ -822,7 +823,7 @@ p.t3<- plot( sm(t.viz, 3) , trans = plogis) +
 p.t4<- plot( sm(t.viz, 4) , trans = plogis) + 
   # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
   geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5) + 
+  l_ciPoly(level = 0.95, alpha = 0.75, fill = state.pal[4]) + 
   l_fitLine() + 
   labs(y = '', x = 'Floodable') +
   ylim(0.4, 0.7) +
