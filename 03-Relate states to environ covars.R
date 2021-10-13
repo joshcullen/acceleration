@@ -11,6 +11,7 @@ library(rnaturalearth)
 library(rnaturalearthhires)
 library(cowplot)
 library(sf)
+library(ggspatial)
 
 source('helper functions.R')
 
@@ -39,12 +40,34 @@ dat$season2<- ifelse(dat$month %in% month.abb[c(10:12,1:3)], "Wet", "Dry")
 pal2<- c(wes_palettes$Darjeeling1, wes_palettes$Darjeeling2[2:1])  #palette
 dat$id<- str_to_title(dat$id)
 
-main.map<- ggplot(dat, aes(x, y, color = id)) +
-  geom_path(aes(group = id, color = id), size = 0.5) +
-  scale_color_manual("", values = pal2) +
+dat.sf<- dat %>% 
+  st_as_sf(., coords = c("x", "y"), crs = 32721) %>% 
+  group_by(id) %>% 
+  dplyr::summarize(do_union = F) %>%
+  sf::st_cast("LINESTRING")
+
+
+#ESRI REST API for world satellite imagery
+esri_world <- paste0('https://services.arcgisonline.com/arcgis/rest/services/',
+                     'World_Imagery/MapServer/tile/${z}/${y}/${x}.jpeg')
+
+main.map<- ggplot() +
+  annotation_map_tile(type = esri_world, zoom = 13, progress = "none") +
+  layer_spatial(dat.sf, size = 0.5, aes(color = id)) +
+  scale_color_manual("",
+                     values = pal2,
+                     labels = c("Blanca (n=2074)",
+                                "Emanuel (n=1032)",
+                                "Gala (n=2008)",
+                                "Mafalda (n=1439)",
+                                "Mazeboti (n=1883)",
+                                "Sara (n=596)",
+                                "Tex (n=916)")) +
   labs(x = "Easting", y = "Northing") +
-  xlim(617000, max(dat$x)) +
-  ylim(min(dat$y), 7887000) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  scale_x_continuous(expand = c(0.2, 0.2)) +
+  annotation_scale(location = "br", width_hint = 0.5, style = "ticks",
+                   line_col = "white", text_col = "white") +
   theme_bw() +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 8),
@@ -52,8 +75,7 @@ main.map<- ggplot(dat, aes(x, y, color = id)) +
         legend.text = element_text(size = 12),
         panel.border = element_rect(fill = NA, color = viridis(3, option = "mako")[2],
                                     size = 2)) +
-  guides(color = guide_legend(override.aes = list(size = 1))) +
-  coord_equal()
+  guides(color = guide_legend(override.aes = list(size = 1)))
 
 #access global map layer for inset
 SA<- ne_countries(scale = 'medium', continent = 'south america')
@@ -88,10 +110,10 @@ inset2<- ggplot() +
                                     size = 1))
 
 ggdraw(main.map) + 
-  draw_plot(inset1, x = 0.15, y = 0.6, width = 0.15, height = 0.3) +
-  draw_plot(inset2, x = 0.3, y = 0.68, width = 0.17, height = 0.17)
+  draw_plot(inset1, x = 0.09, y = 0.6, width = 0.15, height = 0.3) +
+  draw_plot(inset2, x = 0.24, y = 0.68, width = 0.17, height = 0.17)
 
-# ggsave("Figure 1.png", width = 9, height = 6, units = "in", dpi = 330)
+# ggsave("Figure 1_new.png", width = 9, height = 5, units = "in", dpi = 330)
 
 
 
@@ -287,7 +309,7 @@ ggplot(df.season, aes(z.post.thresh, freq, fill = z.post.thresh)) +
 
 df.TON<- dat2 %>% 
   filter(z.post.thresh != "Unclassified") %>% 
-  # mutate(date = date - hours(4)) %>% 
+  mutate(date = date - hours(4)) %>%
   mutate(hour1 = hour(date)) %>% 
   mutate_at('hour1', factor, levels = c(12:23,0:11)) %>% 
   mutate_at('z.post.thresh', droplevels) %>% 
@@ -303,7 +325,7 @@ p.no<- ggplot(data = df.TON, aes(hour1, n, fill = z.post.thresh)) +
            color = "black") +
   scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey")) +
   theme_bw() +
-  labs(x = "Hour", y = "Number of Observations") +
+  labs(x = "Time of day (h)", y = "Number of Observations") +
   theme(axis.title = element_text(size = 20),
         axis.text = element_text(size = 16),
         legend.text = element_text(size = 14),
@@ -319,7 +341,7 @@ p.prop<- ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
            color = "black") +
   scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"), guide = F) +
   theme_bw() +
-  labs(x = "Hour", y = "Proportion of Observations") +
+  labs(x = "Time of day (h)", y = "Proportion of Observations") +
   theme(axis.title = element_text(size = 20),
         axis.text = element_text(size = 12),
         strip.text = element_text(size = 14, face = "bold"),
