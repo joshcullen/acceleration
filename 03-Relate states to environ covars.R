@@ -5,13 +5,14 @@ library(lubridate)
 library(raster)
 library(viridis)
 library(mgcv)
-library(mgcViz)
 library(wesanderson)
 library(rnaturalearth)
 library(rnaturalearthhires)
 library(cowplot)
 library(sf)
 library(ggspatial)
+library(brms)
+library(ggdist)
 
 source('helper functions.R')
 
@@ -29,31 +30,39 @@ dat<-  dat %>%
 dat$date<- as_datetime(dat$date, tz = "UTC")
 dat$month<- month.abb[month(dat$date)]
 dat$month<- factor(dat$month, levels = month.abb[c(5:12,1)])
-dat$season<- ifelse(dat$month %in% c(month.abb[3:5]), "Fall",
-                    ifelse(dat$month %in% c(month.abb[6:8]), "Winter",
-                           ifelse(dat$month %in% c(month.abb[9:11]), "Spring", "Summer")))
-dat$season<- factor(dat$season, levels = c("Fall","Winter","Spring","Summer"))
-dat$season2<- ifelse(dat$month %in% month.abb[c(10:12,1:3)], "Wet", "Dry")
+dat$season<- ifelse(dat$month %in% month.abb[c(10:12,1:3)], "Wet", "Dry")
 
 
 #Plot of all tracks together
 pal2<- c(wes_palettes$Darjeeling1, wes_palettes$Darjeeling2[2:1])  #palette
 dat$id<- str_to_title(dat$id)
 
-dat.sf<- dat %>% 
-  st_as_sf(., coords = c("x", "y"), crs = 32721) %>% 
-  group_by(id) %>% 
-  dplyr::summarize(do_union = F) %>%
-  sf::st_cast("LINESTRING")
+ind<- dat %>% 
+  bayesmove::prep_data(., coord.names = c("x", "y"), id = "id") %>% 
+  summarize(large.step = which(step > 800)) %>%   #find large gaps in tracks (based on filtering step where SL > 800 m were removed; 99th quantile)
+  unlist()
+
+# Inset NA rows at these large gaps (SL > 800)
+dat.sf<- dat
+for (i in 1:length(ind)) {
+  dat.sf<- add_row(dat.sf, id = dat.sf$id[ind[i]], .after = ind[i])
+  ind<- ind+1
+}
+# dat.sf<- dat.sf %>% 
+#   st_as_sf(., coords = c("x", "y"), crs = 32721) %>% 
+#   group_by(id) %>% 
+#   dplyr::summarize(do_union = F) %>%
+#   sf::st_cast("LINESTRING")
 
 
 #ESRI REST API for world satellite imagery
 esri_world <- paste0('https://services.arcgisonline.com/arcgis/rest/services/',
                      'World_Imagery/MapServer/tile/${z}/${y}/${x}.jpeg')
 
+# This version (using geom_spatial_path) gives a warning, but still provides the correct map (for now)
 main.map<- ggplot() +
   annotation_map_tile(type = esri_world, zoom = 13, progress = "none") +
-  layer_spatial(dat.sf, size = 0.5, aes(color = id)) +
+  geom_spatial_path(data = dat.sf, aes(x, y, group = id, color = id), size = 0.5, crs = 32721) +
   scale_color_manual("",
                      values = pal2,
                      labels = c("Blanca (n=2074)",
@@ -78,24 +87,25 @@ main.map<- ggplot() +
   guides(color = guide_legend(override.aes = list(size = 1)))
 
 #access global map layer for inset
-SA<- ne_countries(scale = 'medium', continent = 'south america')
-SA.tr<- spTransform(SA, CRS("+init=epsg:32721"))
-# SA.df<- fortify(SA.tr)
-SA.sf<- st_as_sf(SA.tr)
+SA<- ne_countries(scale = 'medium', continent = 'south america', returnclass = "sf")
+SA.tr<- st_transform(SA, 32721)
+# SA.tr<- spTransform(SA, CRS("EPSG:32721"))
+# # SA.df<- fortify(SA.tr)
+# SA.sf<- st_as_sf(SA.tr)
 
 inset1<- ggplot() +
-  geom_sf(data = SA.sf, fill = "grey75", color = "white", size = 0.25) +
+  geom_sf(data = SA.tr, fill = "grey75", color = "white", size = 0.25) +
   geom_rect(aes(xmin = min(dat$x) - 3e5,
                 xmax = max(dat$x) + 3e5,
                 ymin = min(dat$y) - 3e5,
                 ymax = max(dat$y) + 3e5),
             color = viridis(3, option = "mako")[1], fill = NA, size = 0.5) +
-  scale_x_continuous(expand = c(0,0), limits = c(-2.5e6, st_bbox(SA.sf)$xmax)) +
+  scale_x_continuous(expand = c(0,0), limits = c(-2.5e6, st_bbox(SA.tr)$xmax)) +
   scale_y_continuous(expand = c(0,0)) +
   theme_void()
 
 inset2<- ggplot() +
-  geom_sf(data = SA.sf, fill = "grey75", color = "white", size = 0.25) +
+  geom_sf(data = SA.tr, fill = "grey75", color = "white", size = 0.25) +
   geom_rect(aes(xmin = min(dat$x),
                 xmax = max(dat$x),
                 ymin = min(dat$y),
@@ -219,7 +229,7 @@ ggplot() +
 ### Extract environ covars for all obs ###
 ##########################################
 
-dry.ind<- which(dat$season2 == "Dry")
+dry.ind<- which(dat$season == "Dry")
 
 # Proportions LULC w/in 30 m buffer (by season)
 
@@ -286,7 +296,7 @@ ggplot(df.ID, aes(z.post.thresh, freq, fill = z.post.thresh)) +
 ## Proportion of behavior by season
 
 df.season<- dat2 %>% 
-  group_by(season2, z.post.thresh) %>% 
+  group_by(season, z.post.thresh) %>% 
   summarize(n = n()) %>% 
   mutate(freq = n / sum(n))
 
@@ -296,7 +306,7 @@ ggplot(df.season, aes(z.post.thresh, freq, fill = z.post.thresh)) +
                     guide = guide_legend(reverse = TRUE)) +
   theme_bw() +
   labs(x = "", y = "Proportion of Observations") +
-  facet_wrap(~ season2) +
+  facet_wrap(~ season) +
   coord_flip() +
   theme(axis.title = element_text(size = 16),
         axis.text = element_text(size = 12),
@@ -339,7 +349,7 @@ p.prop<- ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
                     ymin = -Inf, ymax = Inf) +
   geom_bar(stat = "identity",
            color = "black") +
-  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"), guide = F) +
+  scale_fill_manual("", values = c(viridis(n=4, option = 'inferno'), "grey"), guide = "none") +
   theme_bw() +
   labs(x = "Time of day (h)", y = "Proportion of Observations") +
   theme(axis.title = element_text(size = 20),
@@ -551,356 +561,170 @@ ggplot(df.state.floodable, aes(as.numeric(as.character(Floodable)), prop,
 
 
 
-#######################################################
-### Analyze relationships between states and covars ###
-#######################################################
+##########################################################################################
+### Analyze relationships between states and covars as multinomial logistic regression ###
+##########################################################################################
 
 
 #remove observations w/ "Unclassified" state (based on z.post.thresh)
 dat3<- dat2 %>% 
-  filter(z.post.thresh != "Unclassified") %>% 
-  mutate(across(.cols = c(Forest:Floodable), scale)) %>%
-  mutate(across(c(id,season2), factor))
-
-#set new scales and labels for plots
-att.forest <- attributes(dat3$Forest)
-att.cs <- attributes(dat3$Closed_Savanna)
-att.os <- attributes(dat3$Open_Savanna)
-att.flood <- attributes(dat3$Floodable)
-
-gam.labels <- seq(0, 1, 0.2)
-forest.breaks <- scale(gam.labels, att.forest[2], att.forest[3])[,1]
-cs.breaks <- scale(gam.labels, att.cs[2], att.cs[3])[,1]
-os.breaks <- scale(gam.labels, att.os[2], att.os[3])[,1]
-flood.breaks <- scale(gam.labels, att.flood[2], att.flood[3])[,1]
-
-state.pal<- viridis(n=4, option = 'inferno')
+  filter(z.post.thresh != "Unclassified") %>%  #remove Unclassified obs
+  mutate(across(id, factor))  #convert ID to factor
 
 
+## prior predictive check
+fit0 <-
+  brm(data = dat3, 
+      family = categorical(link = logit, refcat = 'VE'),
+      z.post.thresh ~ Forest + I(Forest^2) + Open_Savanna + I(Open_Savanna^2) + 
+        Floodable + I(Floodable^2) + (1|id),
+      prior = c(prior(normal(1, 2), class = Intercept, dpar = muLocalSearch),
+                prior(normal(1, 2), class = Intercept, dpar = muExploratory),
+                prior(normal(1, 2), class = Intercept, dpar = muTransit),
+                prior(normal(0, 5), class = b, dpar = muLocalSearch),
+                prior(normal(0, 5), class = b, dpar = muExploratory),
+                prior(normal(0, 5), class = b, dpar = muTransit),
+                prior(exponential(1), class = sd, dpar = muLocalSearch),
+                prior(exponential(1), class = sd, dpar = muExploratory),
+                prior(exponential(1), class = sd, dpar = muTransit)),
+      iter = 2000, warmup = 1000, cores = 4, chains = 4,
+      seed = 123, sample_prior = "only")
 
-## Compare VE vs all others
-dat.ve<- dat3
-dat.ve$state<- ifelse(dat.ve$z.post.thresh == "VE", 1, 0)
-table(dat.ve$id, dat.ve$state)  #check n per combo
-ve.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                  s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                  s(id, bs = "re"),
-                data = dat.ve, family = binomial, method = "REML")
-summary(ve.mod)
+pp_check(fit0, 
+         type = "bars", 
+         ndraws = 200, 
+         size = 1/2, 
+         fatten = 2)
 
-# prep data for plotting w/ mgcViz
-ve.viz<- getViz(ve.mod)
+## run model
+fit1 <-
+  brm(data = dat3, 
+      family = categorical(link = logit, refcat = 'VE'),
+      z.post.thresh ~ Forest + I(Forest^2) + Open_Savanna + I(Open_Savanna^2) + 
+        Floodable + I(Floodable^2) + (1|id),
+      prior = c(prior(normal(1, 2), class = Intercept, dpar = muLocalSearch),
+                prior(normal(1, 2), class = Intercept, dpar = muExploratory),
+                prior(normal(1, 2), class = Intercept, dpar = muTransit),
+                prior(normal(0, 5), class = b, dpar = muLocalSearch),
+                prior(normal(0, 5), class = b, dpar = muExploratory),
+                prior(normal(0, 5), class = b, dpar = muTransit),
+                prior(exponential(1), class = sd, dpar = muLocalSearch),
+                prior(exponential(1), class = sd, dpar = muExploratory),
+                prior(exponential(1), class = sd, dpar = muTransit)),
+      iter = 2000, warmup = 1000, cores = 4, chains = 4,
+      seed = 123)
 
-## define theme for GAMM ggplots
-theme_gam <- function(){ 
-  font <- "Arial"   #assign font family up front
-  
-  theme_bw() %+replace%    #replace elements we want to change
-    
-    theme(
-      
-      #grid elements
-      panel.grid.major = element_blank(),    #strip major gridlines
-      panel.grid.minor = element_blank(),    #strip minor gridlines
-      
-      axis.title = element_text(             #axis titles
-        family = font,            #font family
-        size = 18),               #font size
-      
-      axis.text = element_text(              #axis text
-        family = font,            #axis famuly
-        size = 14),                #font size
-      
-      axis.text.x = element_text(            #margin for axis text
-        margin=margin(5, b = 10))
-      
-      
-    )
-}
+print(fit1)
+plot(fit1)  #traceplots and density plots for each param
 
-p.ve1<- plot( sm(ve.viz, 1) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[1]) + 
-  l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' VE')), x = '') +
-  ylim(0.35, 0.72) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
-  theme_gam()
-p.ve2<- plot( sm(ve.viz, 2) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[1]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.35, 0.72) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
-  theme_gam()
-p.ve3<- plot( sm(ve.viz, 3) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[1]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.35, 0.72) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
-  theme_gam()
-p.ve4<- plot( sm(ve.viz, 4) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[1]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.35, 0.72) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
-  theme_gam()
-
-#define covariates in vector for axis labels
-# lulc<- c("Forest", "Closed Savanna", "Open Savanna", "Floodable")
-# par(mfrow = c(1,4))
-# for (i in 1:4) {
-#   y.title<- ifelse(i == 1, "Probability of Local Search", "")
-#   plot(st.su.mod, seWithMean = T, rug = T, shade = T, select = i,
-#        xlab = lulc[i], ylab = y.title, cex.axis = 1, cex.lab = 1)
-#   abline(h = 0.5, lty = 2)
-# }
+ce.95 <- conditional_effects(
+  fit1, 
+  categorical = TRUE,
+  effects = c("Forest", "Open_Savanna", "Floodable"),
+  prob = 0.95,  #95% quantile
+  method = "fitted",
+  resolution = 1000)
+ce.50 <- conditional_effects(
+  fit1, 
+  categorical = TRUE,
+  effects = c("Forest", "Open_Savanna", "Floodable"),
+  prob = 0.5,  #50% quantile
+  method = "fitted",
+  resolution = 1000)
 
 
+ce.95.df <- ce.95 %>% 
+  map({. %>% dplyr::select(effect1__:upper__)}) %>% 
+  bind_rows(.id = "lulc") %>% 
+  mutate(lulc = gsub(":.*", "", lulc)) %>% 
+  mutate(lulc = gsub("Open_Savanna", "Open Savanna", lulc)) %>% 
+  mutate(across(lulc, factor, levels = c('Forest', 'Open Savanna', 'Floodable'))) %>% 
+  mutate(prob = 0.95)
+ce.50.df <- ce.50 %>% 
+  map({. %>% dplyr::select(effect1__:upper__)}) %>% 
+  bind_rows(.id = "lulc") %>% 
+  mutate(lulc = gsub(":.*", "", lulc)) %>% 
+  mutate(lulc = gsub("Open_Savanna", "Open Savanna", lulc)) %>% 
+  mutate(across(lulc, factor, levels = c('Forest', 'Open Savanna', 'Floodable'))) %>% 
+  mutate(prob = 0.5)
 
-
-
-## Compare Local Search vs all others
-dat.ls<- dat3
-dat.ls$state<- ifelse(dat.ls$z.post.thresh == "Local Search", 1, 0)
-table(dat.ls$id, dat.ls$state)  #check n per combo
-ls.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                  s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                  s(id, bs = "re"),
-                data = dat.ls, family = binomial, method = "REML")
-summary(ls.mod)
-
-# prep data for plotting w/ mgcViz
-ls.viz<- getViz(ls.mod)
-
-p.ls1<- plot( sm(ls.viz, 1) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[2]) + 
-  l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Local Search')), x = '') +
-  ylim(0.4, 0.6) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
-  theme_gam()
-p.ls2<- plot( sm(ls.viz, 2) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[2]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.4, 0.6) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
-  theme_gam()
-p.ls3<- plot( sm(ls.viz, 3) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[2]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.4, 0.6) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
-  theme_gam()
-p.ls4<- plot( sm(ls.viz, 4) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[2]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.44, 0.56) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
-  theme_gam()
-
-# for (i in 1:4) {
-#   plot(st.exp.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
-#        xlab = lulc[i], ylab = "Probability of Exploratory", cex.axis = 1, cex.lab = 1)
-#   abline(h = 0.5, lty = 2)
-# }
-
-
-
-
-## Compare Exploratory vs all others
-dat.exp<- dat3
-dat.exp$state<- ifelse(dat.exp$z.post.thresh == "Exploratory", 1, 0)
-table(dat.exp$id, dat.exp$state)  #check n per combo
-exp.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                   s(id, bs = "re"),
-                 data = dat.exp, family = binomial, method = "REML")
-summary(exp.mod)
-
-# prep data for plotting w/ mgcViz
-exp.viz<- getViz(exp.mod)
-
-p.exp1<- plot( sm(exp.viz, 1) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[3]) + 
-  l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Exploratory')), x = '') +
-  ylim(0.3, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
-  theme_gam()
-p.exp2<- plot( sm(exp.viz, 2) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[3]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.3, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
-  theme_gam()
-p.exp3<- plot( sm(exp.viz, 3) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[3]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.3, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
-  theme_gam()
-p.exp4<- plot( sm(exp.viz, 4) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.5, fill = state.pal[3]) + 
-  l_fitLine() + 
-  labs(y = '', x = '') +
-  ylim(0.3, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
-  theme_gam()
-
-
-# for (i in 1:4) {
-#   plot(st.t.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
-#        xlab = lulc[i], ylab = "Probability of Transit", cex.axis = 1, cex.lab = 1)
-#   abline(h = 0.5, lty = 2)
-# }
-
-
-
-## Compare Transit vs all others
-dat.t<- dat3
-dat.t$state<- ifelse(dat.t$z.post.thresh == "Transit", 1, 0)
-table(dat.t$id, dat.t$state)  #check n per combo
-t.mod<- gam(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                   s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                   s(id, bs = "re"),
-                 data = dat.t, family = binomial, method = "REML")
-summary(t.mod)
-
-# prep data for plotting w/ mgcViz
-t.viz<- getViz(t.mod)
-
-p.t1<- plot( sm(t.viz, 1) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.75, fill = state.pal[4]) + 
-  l_fitLine() + 
-  labs(y = expression(paste(italic(Pr), ' Transit')), x = 'Forest') +
-  ylim(0.4, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = forest.breaks) +
-  theme_gam()
-p.t2<- plot( sm(t.viz, 2) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.75, fill = state.pal[4]) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Closed Savanna') +
-  ylim(0.4, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = cs.breaks) +
-  theme_gam()
-p.t3<- plot( sm(t.viz, 3) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.75, fill = state.pal[4]) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Open Savanna') +
-  ylim(0.4, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = os.breaks) +
-  theme_gam()
-p.t4<- plot( sm(t.viz, 4) , trans = plogis) + 
-  # l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  geom_hline(yintercept = 0.5, linetype = 2) +
-  l_ciPoly(level = 0.95, alpha = 0.75, fill = state.pal[4]) + 
-  l_fitLine() + 
-  labs(y = '', x = 'Floodable') +
-  ylim(0.4, 0.7) +
-  # l_points(shape = 19, size = 1, alpha = 0.1) + 
-  scale_x_continuous(labels = gam.labels, breaks = flood.breaks) +
-  theme_gam()
-
-# for (i in 1:4) {
-#   plot(su.exp.mod, trans = plogis, seWithMean = T, rug = T, shade = T, select = i,
-#        xlab = lulc[i], ylab = "Probability of Exploratory", cex.axis = 1, cex.lab = 1)
-#   abline(h = 0.5, lty = 2)
-# }
-
-
-
-
-## Create panel plot
-# png('Figure 5.png', width = 12, height = 8, units = "in", res = 330)
-gridPrint(p.ve1, p.ve2, p.ve3, p.ve4,
-          p.ls1, p.ls2, p.ls3, p.ls4,
-          p.exp1, p.exp2, p.exp3, p.exp4,
-          p.t1, p.t2, p.t3, p.t4,
-          nrow = 4, ncol = 4)
-# dev.off()
-
-
-
-
-
-
-
-
-
-
-### Behavioral valuation of landscape
-dry.lulc.df2<- dry.lulc.df
-dry.lulc.df2$lulc<- ifelse(dry.lulc.df2$lulc == 3, 2, dry.lulc.df2$lulc)
-  
-pal1<- viridis(4, option = "inferno")
-
-ggplot() +
-  geom_raster(data = dry.lulc.df2, aes(x, y, fill = factor(lulc))) +
-  scale_fill_manual("", values = c(pal1[1], "grey85", pal1[4]),
-                    na.value = "transparent",
-                    labels = c("Slow-Turn", "Mixed", "Transit","")) +
-  scale_x_continuous(expand = c(0,0)) +
-  scale_y_continuous(expand = c(0,0)) +
-  labs(x="Easting", y="Northing") +
+ggplot(ce.95.df, aes(effect1__, estimate__, group = effect2__)) +
+  geom_line(aes(color = effect2__), size = 2) +
+  scale_color_viridis_d("", option = "inferno", begin = 0, end = 0.8) +
+  geom_ribbon(aes(ymin = lower__, ymax = upper__, fill = effect2__), alpha = 0.6) +
+  scale_fill_viridis_d("", option = "inferno") +
+  geom_ribbon(data = ce.50.df, aes(ymin = lower__, ymax = upper__, fill = effect2__),
+              alpha = 0.5) +
   theme_bw() +
-  coord_equal() +
-  theme(legend.position = "right",
-        axis.title = element_text(size = 18),
-        axis.text = element_text(size = 10),
+  ylab("Probability") +
+  scale_y_continuous(breaks = seq(0, 0.6, by = 0.1)) +
+  theme(panel.grid = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 16),
+        strip.text = element_text(size = 20),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        legend.text = element_text(size = 16),
+        legend.position = "top",
+        panel.spacing.x = unit(1, "lines")) +
+  facet_wrap(~ lulc, nrow = 1, strip.position = "bottom")
+
+# ggsave('Figure 5_new.png', width = 12, height = 9, units = "in", dpi = 330)
+
+
+## posterior predictive check
+pp_check(fit1, 
+         type = "bars", 
+         ndraws = 200, 
+         size = 1/2, 
+         fatten = 2)
+
+
+
+## Create density plot of parameter estimates from posterior
+fit1.post <- fit1 %>% 
+  as_draws_df(variable = "^b_", regex = TRUE) %>% 
+  pivot_longer(cols = 1:21, names_to = "coeff", values_to = "value") %>% 
+  mutate(state = case_when(str_detect(string = coeff, pattern = "LocalSearch") ~ "Local Search",
+                           str_detect(string = coeff, pattern = "Exploratory") ~ "Exploratory",
+                           str_detect(string = coeff, pattern = "Transit") ~ "Transit"),
+         coeff.name = case_when(str_detect(string = coeff, pattern = "Intercept") ~ "Intercept",
+                                str_detect(string = coeff, pattern = "Forest$") ~ "Forest",
+                                str_detect(string = coeff, pattern = "ForestE2") ~ "Forest^2",
+                                str_detect(string = coeff, pattern = "Open_Savanna$") ~ "Open Savanna",
+                                str_detect(string = coeff, pattern = "Open_SavannaE2") ~ "Open Savanna^2",
+                                str_detect(string = coeff, pattern = "Floodable$") ~ "Floodable",
+                                str_detect(string = coeff, pattern = "FloodableE2") ~ "Floodable^2")
+  )
+
+fit1.post$state <- factor(fit1.post$state, levels = c("Local Search", "Exploratory", "Transit"))
+fit1.post$coeff.name <- factor(fit1.post$coeff.name,
+                               levels = c("Intercept", "Forest", "Forest^2", "Open Savanna",
+                                          "Open Savanna^2", "Floodable", "Floodable^2"))
+
+
+ggplot(fit1.post, aes(x = value, y = coeff.name, fill = state, color = state)) +
+  geom_vline(xintercept = 0, size = 1) +
+  stat_slab(alpha = 0.5) +
+  labs(x = "Value", y = "") +
+  scale_fill_manual("State",
+                    values = viridis(n=4, begin = 0, end = 0.95, option = "inferno")[2:4]) +
+  scale_color_manual("State",
+                     values = viridis(n=4, begin = 0, end = 0.90, option = "inferno")[2:4]) +
+  scale_x_continuous(breaks = seq(-8, 8, by = 2), limits = c(-8,8)) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 16),
         legend.title = element_text(size = 14),
-        legend.text = element_text(size = 12))
+        legend.text = element_text(size = 12),
+        legend.position = "top")
+
+# ggsave('Figure S2.png', width = 8, height = 6, units = "in", dpi = 330)
+
+
+
 
 
 
@@ -915,19 +739,42 @@ dat3$state<- as.numeric(dat3$z.post.thresh) - 1
 
 
 table(dat3$id, dat3$state)  #check n per combo
-mod1<- gam(list(state ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                  s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                  s(id, bs = "re"),
-                ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                  s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                  s(id, bs = "re"),
-                ~ s(Forest, k = 5, bs = "cs") + s(Closed_Savanna, k = 5, bs = "cs") +
-                  s(Open_Savanna, k = 5, bs = "cs") + s(Floodable, k = 5, bs = "cs") +
-                  s(id, bs = "re")),
+mod1<- gam(list(state ~ s(Forest, k = 3, bs = "cs") + s(Open_Savanna, k = 3, bs = "cs") + 
+                  s(Floodable, k = 3, bs = "cs") + s(id, bs = "re"),
+                ~ s(Forest, k = 3, bs = "cs") + s(Open_Savanna, k = 3, bs = "cs") + 
+                  s(Floodable, k = 3, bs = "cs") + s(id, bs = "re"),
+                ~ s(Forest, k = 3, bs = "cs") + s(Open_Savanna, k = 3, bs = "cs") + 
+                  s(Floodable, k = 3, bs = "cs") + s(id, bs = "re")),
            data = dat3, family = multinom(K=3), method = "REML")
 
 summary(mod1)
-plot(mod1, pages=1)
+plot(mod1, pages=1, trans = plogis)
+
+
+
+## Manually create partial effects plots
+pred.multinom.mod<- predict(mod1, newdata = new.dat, type = "response", se.fit = TRUE,
+                     exclude = "s(id)")
+
+
+pred.multinom.df<- pred.multinom.mod$fit %>% 
+  data.frame() %>% 
+  rename(VE = X1, LocalSearch = X2, Exploratory = X3, Transit = X4) %>% 
+  mutate(#lower = plogis(fit - 1.96*se),
+         #upper = plogis(fit + 1.96*se),
+         x = rep(x.seq, 3),
+         LULC = factor(rep(c("Forest", "Open Savanna", "Floodable"), each = 100),
+                       levels = c("Forest", "Open Savanna", "Floodable"))
+  ) %>% 
+  pivot_longer(cols = VE:Transit, names_to = "state", values_to = "prob") #%>% 
+  # mutate(fit = plogis(fit),
+  #        mod = "Pr(Transit)")
+
+
+ggplot(pred.multinom.df, aes(x, prob, color = state)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~ LULC, ncol = 1)
 
 ##########################################################
 ### Explore Relationships between Vegetation and Water ###
