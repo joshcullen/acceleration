@@ -612,7 +612,7 @@ fit1 <-
                 prior(exponential(1), class = sd, dpar = muExploratory),
                 prior(exponential(1), class = sd, dpar = muTransit)),
       iter = 2000, warmup = 1000, cores = 4, chains = 4,
-      seed = 123)
+      seed = 123, backend = "cmdstanr")
 
 print(fit1)
 plot(fit1)  #traceplots and density plots for each param
@@ -725,7 +725,68 @@ ggplot(fit1.post, aes(x = value, y = coeff.name, fill = state, color = state)) +
 
 
 
+## Create plots of expected (mean) behavioral state probability when in 100% of each LU/LC
 
+newdata <- data.frame(Forest = c(1, 0, 0, 0),
+                       `I(Forest^2)` = c(1, 0, 0, 0),
+                       Open_Savanna = c(0, 1, 0, 0),
+                       `I(Open_Savanna^2)` = c(0, 1, 0, 0),
+                       Floodable = c(0, 0, 1, 0),
+                       `I(Floodable^2)` = c(0, 0, 1, 0),
+                      id = NA
+                      )
+names(newdata) <- c('Forest', "I(Forest^2)", 'Open_Savanna', "I(Open_Savanna^2)",
+                    'Floodable', "I(Floodable^2)", "id")
+
+pred.lulc.1 <- fit1 %>% 
+  # tidybayes::predicted_draws(newdata = newdata, seed = 123, re_formula = NA)
+  posterior_epred(newdata, re_formula = NA)
+
+
+# For plotting mean of state proportions
+pred.means <- colMeans(pred.lulc.1) %>% 
+  data.frame() %>% 
+  mutate(class = factor(c('Forest', 'Open Savanna', 'Floodable', 'Closed Savanna'),
+                        levels = c('Forest', 'Open Savanna', 'Floodable', 'Closed Savanna'))) %>% 
+  pivot_longer(cols = -class, names_to = "state", values_to = "prop") %>% 
+  mutate(state = str_replace(state, 'Local.Search', 'Local Search')) %>% 
+  mutate(across(state, factor, levels = c('VE', 'Local Search', 'Exploratory', 'Transit')))
+
+ggplot(pred.means, aes(class, prop, fill = state)) +
+  geom_col() +
+  scale_fill_viridis_d("", option = "inferno") +
+  labs(x = "", y = "Probability") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 16),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = "top")
+
+
+# For plotting full distribution of state proportions
+dims <- dim(pred.lulc.1)
+pred.distr <- expand.grid(state = c('VE', 'Local Search', 'Exploratory', 'Transit'),
+                          class = c('Forest', 'Open Savanna', 'Floodable', 'Closed Savanna'),
+                          row1 = 1:4000) %>% 
+  arrange(state, class) %>% 
+  mutate(prob = array(apply(pred.lulc.1, 3, rbind), dims[1] * dims[2] * dims[3]))
+
+
+ggplot(pred.distr, aes(class, prob, fill = state)) +
+  geom_violin(position = position_dodge(0.3)) +
+  scale_fill_viridis_d("", option = "inferno") +
+  labs(x = "", y = "Probability") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 16),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = "top")
+
+# ggsave('Figure S3.png', width = 8, height = 6, units = "in", dpi = 330)
 
 
 ########################
