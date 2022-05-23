@@ -1,4 +1,5 @@
 # acceleration
+[![DOI](https://zenodo.org/badge/293832916.svg)](https://zenodo.org/badge/latestdoi/293832916)
 
 R code associated w/ Cullen et al. paper on the estimation of behavioral states and habitat associations in giant armadillos using acceleration and GPS data.
 
