@@ -1,6 +1,6 @@
 
 #### Estimate behavioral states from armadillo data using bayesmove mixture model ####
-## Last revised 2022-05-18 by Josh Cullen
+## Last revised 2022-09-29 by Josh Cullen
 
 library(bayesmove)
 library(tidyverse)
@@ -147,7 +147,7 @@ ggplot(behav.res3, aes(x = labs, y = prop, fill = behav)) +
   scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
   facet_grid(behav ~ var, scales = "free_x")
 
-# ggsave("Figures/Figure 3.tiff", width = 7, height = 7, units = "in", dpi = 400)
+# ggsave("Figures/Figure 4.tiff", width = 7, height = 7, units = "in", dpi = 400)
 
 
 
@@ -374,4 +374,4 @@ ggplot(behav.res3, aes(x = labs, y = prop, fill = behav)) +
   scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
   facet_grid(behav ~ var, scales = "free_x")
 
-# ggsave("Figures/Figure S3.png", width = 7, height = 7, units = "in", dpi = 330)
+# ggsave("Figures/Figure S1.png", width = 7, height = 7, units = "in", dpi = 330)

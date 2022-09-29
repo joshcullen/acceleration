@@ -1,4 +1,5 @@
 ### Relate state estimates to environmental covariates
+## Last revised 2022-09-29 by Josh Cullen
 
 library(tidyverse)
 library(lubridate)
@@ -8,7 +9,7 @@ library(mgcv)
 library(wesanderson)
 library(rnaturalearth)
 library(rnaturalearthhires)
-library(cowplot)
+library(patchwork)
 library(sf)
 library(ggspatial)
 library(brms)
@@ -312,7 +313,8 @@ p.no<- ggplot(data = df.TON, aes(hour1, n, fill = z.post.thresh)) +
         axis.text = element_text(size = 16),
         legend.text = element_text(size = 14),
         legend.position = "top",
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        plot.margin = unit(c(30, 5.5, 5.5, 5.5), "pt"))
 
 
 p.prop<- ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
@@ -332,8 +334,10 @@ p.prop<- ggplot(data = df.TON, aes(hour1, freq, fill = z.post.thresh)) +
   facet_wrap(~ z.post.thresh)
 
 
-plot_grid(p.no, p.prop, nrow = 2)
-# ggsave("Figures/Figure 4.png", width = 12, height = 8, dpi = 400)
+p.no / p.prop + plot_annotation(tag_levels = 'a') & 
+  theme(plot.tag.position = c(0.05, 1), plot.tag = element_text(size = 18, hjust = 0, vjust = 0,
+                                                                face = 'bold'))
+# ggsave("Figures/Figure 5.png", width = 12, height = 8, dpi = 400)
 
 
 
@@ -452,7 +456,7 @@ ggplot(ce.95.df, aes(effect1__, estimate__, group = effect2__)) +
         panel.spacing.x = unit(1, "lines")) +
   facet_wrap(~ lulc, nrow = 1, strip.position = "bottom")
 
-# ggsave('Figures/Figure 5.png', width = 12, height = 9, units = "in", dpi = 400)
+# ggsave('Figures/Figure 6.png', width = 12, height = 9, units = "in", dpi = 400)
 
 
 ## posterior predictive check
@@ -490,9 +494,9 @@ ggplot(fit1.post, aes(x = value, y = coeff.name, fill = state, color = state)) +
   geom_vline(xintercept = 0, size = 1) +
   stat_slab(alpha = 0.5) +
   labs(x = "Value", y = "") +
-  scale_fill_manual("State",
+  scale_fill_manual("Behavioral state",
                     values = viridis(n=4, begin = 0, end = 0.95, option = "inferno")[2:4]) +
-  scale_color_manual("State",
+  scale_color_manual("Behavioral state",
                      values = viridis(n=4, begin = 0, end = 0.90, option = "inferno")[2:4]) +
   scale_x_continuous(breaks = seq(-8, 8, by = 2), limits = c(-8,8)) +
   theme_bw() +
@@ -503,7 +507,7 @@ ggplot(fit1.post, aes(x = value, y = coeff.name, fill = state, color = state)) +
         legend.text = element_text(size = 12),
         legend.position = "top")
 
-# ggsave('Figures/Figure S1.png', width = 8, height = 6, units = "in", dpi = 330)
+# ggsave('Figures/Figure S2.png', width = 8, height = 6, units = "in", dpi = 330)
 
 
 
@@ -545,6 +549,6 @@ ggplot(pred.distr, aes(class, prob, fill = state)) +
         legend.text = element_text(size = 12),
         legend.position = "top")
 
-# ggsave('Figures/Figure S2.png', width = 8, height = 6, units = "in", dpi = 330)
+# ggsave('Figures/Figure S3.png', width = 8, height = 6, units = "in", dpi = 330)
 
 

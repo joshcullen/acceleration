@@ -1,10 +1,11 @@
 
 #### Pre-process armadillo data for bayesmove behavior model ####
-## Last revised 2022-05-18 by Josh Cullen
+## Last revised 2022-09-29 by Josh Cullen
 
 library(bayesmove)
 library(tidyverse)
 library(lubridate)
+library(patchwork)
 
 
 ### Import Armadillo GPS Data ###
@@ -302,38 +303,46 @@ boxplot(ta2~ta.cat, data=dat3)
 
 
 # Viz density distribs w/ bin limits
-ggplot(dat3, aes(act.count)) +
+p.act <- ggplot(dat3, aes(act.count)) +
   geom_density(fill = "cadetblue") +
   geom_vline(data = data.frame(lims = act.brk), aes(xintercept = lims), 
              linetype = "dashed") +
+  labs(x = "Activity count", y = "Density") +
   theme_bw() +
   theme(panel.grid = element_blank(),
         axis.title = element_text(size = 16),
-        axis.text = element_text(size = 12))
+        axis.text = element_text(size = 12),
+        plot.margin = unit(c(30, 5.5, 5.5, 5.5), "pt"))
 
 
-ggplot(dat3, aes(sl2)) +
+p.speed <- ggplot(dat3, aes(sl2/60)) +  #plot in m/s instead of m/min
   geom_density(fill = "lightblue") +
-  geom_vline(data = data.frame(lims = sl.brk), aes(xintercept = lims), 
+  geom_vline(data = data.frame(lims = sl.brk), aes(xintercept = lims/60),  #plot in m/s instead of m/min
              linetype = "dashed") +
+  labs(x = "Speed (m/s)", y = "Density") +
   theme_bw() +
   theme(panel.grid = element_blank(),
         axis.title = element_text(size = 16),
         axis.text = element_text(size = 12))
 
 
-ggplot(dat3, aes(ta2)) +
+p.ta <- ggplot(dat3, aes(ta2)) +
   geom_density(fill = "indianred") +
   geom_vline(data = data.frame(lims = ta.brk), aes(xintercept = lims), 
              linetype = "dashed") +
+  labs(x = "Turning angle (radians)", y = "Density") +
   theme_bw() +
   theme(panel.grid = element_blank(),
         axis.title = element_text(size = 16),
         axis.text = element_text(size = 12))
 
 
+## Create composite plot
+p.act / p.speed / p.ta + plot_annotation(tag_levels = 'a') & 
+  theme(plot.tag.position = c(0.08, 1), plot.tag = element_text(size = 18, hjust = 0, vjust = -0.4,
+                                                                face = 'bold'))
 
-
+# ggsave("Figures/Figure 3.tiff", width = 5, height = 7, units = "in", dpi = 400)
 
 
 
