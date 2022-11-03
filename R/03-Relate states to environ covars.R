@@ -167,7 +167,7 @@ ggplot() +
         strip.background = element_blank()) +
   facet_wrap(~ season)
 
-# ggsave("Figures/Figure 2.tiff", width = 7, height = 4, units = "in", dpi = 400)
+# ggsave("Figures/Figure 3.png", width = 7, height = 4, units = "in", dpi = 400)
 
 
 

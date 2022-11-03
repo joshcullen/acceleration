@@ -342,7 +342,7 @@ p.act / p.speed / p.ta + plot_annotation(tag_levels = 'a') &
   theme(plot.tag.position = c(0.08, 1), plot.tag = element_text(size = 18, hjust = 0, vjust = -0.4,
                                                                 face = 'bold'))
 
-# ggsave("Figures/Figure 3.tiff", width = 5, height = 7, units = "in", dpi = 400)
+# ggsave("Figures/Figure 2.png", width = 5, height = 7, units = "in", dpi = 400)
 
 
 

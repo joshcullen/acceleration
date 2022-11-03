@@ -147,7 +147,7 @@ ggplot(behav.res3, aes(x = labs, y = prop, fill = behav)) +
   scale_y_continuous(breaks = c(0.00, 0.50, 1.00)) +
   facet_grid(behav ~ var, scales = "free_x")
 
-# ggsave("Figures/Figure 4.tiff", width = 7, height = 7, units = "in", dpi = 400)
+# ggsave("Figures/Figure 4.png", width = 7, height = 7, units = "in", dpi = 400)
 
 
 
